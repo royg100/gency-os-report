@@ -1,0 +1,23 @@
+<div class="header-bar">
+    <h2 class="fw-bold m-0">מרכז שליטה</h2>
+    <span class="badge bg-primary rounded-pill px-3 py-2">ניהול תיקים</span>
+</div>
+
+<div class="upload-hero mb-5" onclick="App.triggerUpload()">
+    <i class="fas fa-file-import fa-4x text-primary mb-3"></i>
+    <h3 class="fw-bold">טעינת קבצי אקסל</h3>
+    <p class="text-muted">המערכת תזהה אוטומטית משפחות ומבוטחים</p>
+</div>
+
+<div class="card-box">
+    <h4 class="fw-bold mb-4">מאגר לקוחות</h4>
+    <input type="text" class="form-control form-control-lg border-0 bg-light mb-4" placeholder="חיפוש חכם..." onkeyup="App.filterClients(this.value)">
+    
+    <div class="table-responsive">
+        <table class="styled-table w-100">
+            <thead><tr><th>שם הלקוח</th><th>סטטוס</th><th>פרמיה</th><th>נכסים</th><th>פעולות</th></tr></thead>
+            <tbody id="clients-list-body">
+                </tbody>
+        </table>
+    </div>
+</div>

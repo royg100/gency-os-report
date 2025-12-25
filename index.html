@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מבט 360 - AgencyOS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #ec4899; --primary-dark: #db2777; --secondary: #2c3e50;
+            --bg: #f1f5f9; --white: #ffffff; --gray: #94a3b8; --success: #10b981;
+        }
+
+        body {
+            font-family: 'Assistant', sans-serif; background-color: var(--bg); color: var(--secondary);
+            margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+        }
+
+        /* מסך העלאה */
+        #uploadView { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; padding: 20px; }
+        .upload-container { background: var(--white); width: 100%; max-width: 600px; padding: 50px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; }
+        .logo { font-size: 3.5rem; color: var(--primary); margin-bottom: 15px; }
+        .upload-zone { border: 2px dashed #cbd5e1; border-radius: 16px; padding: 50px 20px; cursor: pointer; transition: all 0.3s ease; background: #fdfdfd; margin: 20px 0; }
+        .upload-zone:hover { border-color: var(--primary); background: #fdf2f8; transform: scale(1.01); }
+        .upload-icon { font-size: 3rem; color: #cbd5e1; margin-bottom: 15px; }
+        .generate-btn { background: var(--secondary); color: white; border: none; padding: 16px 30px; border-radius: 12px; font-size: 1.2rem; font-weight: 700; cursor: pointer; width: 100%; display: none; }
+        .generate-btn:hover { background: #1e293b; transform: translateY(-2px); }
+
+        /* מסך דשבורד */
+        #dashboardView { display: none; flex-direction: column; height: 100%; }
+        .top-bar { background: var(--secondary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .app-brand { font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .top-actions { display: flex; gap: 10px; }
+        .top-actions button { background: rgba(255,255,255,0.1); border: none; color: white; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; display: flex; align-items: center; gap: 6px; }
+        .top-actions button:hover { background: rgba(255,255,255,0.2); }
+        .btn-pdf { background: var(--success) !important; font-weight: 600; }
+        .btn-pdf:hover { background: #059669 !important; }
+        .btn-print { background: var(--primary) !important; font-weight: 600; }
+        
+        .tabs-container { background: var(--white); padding: 0 20px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 5px; overflow-x: auto; }
+        .tab-btn { padding: 15px 25px; background: transparent; border: none; border-bottom: 3px solid transparent; font-weight: 600; color: var(--gray); cursor: pointer; white-space: nowrap; }
+        .tab-btn:hover { color: var(--primary); background: #f8fafc; }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: #fff0f7; }
+
+        .content-area { flex: 1; background: #e2e8f0; padding: 20px; overflow: hidden; position: relative; }
+        iframe { width: 100%; height: 100%; border: none; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .loader { width: 48px; height: 48px; border: 5px solid #FFF; border-bottom-color: var(--primary); border-radius: 50%; display: none; margin: 20px auto; animation: rotation 1s linear infinite; }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="uploadView">
+        <div class="upload-container">
+            <div class="logo"><i class="fas fa-layer-group"></i></div>
+            <h1>מבט 360</h1>
+            <p>גרור את כל קבצי האקסל לכאן</p>
+            <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                <div class="upload-text">גרור קבצים לכאן</div>
+                <input type="file" id="fileInput" multiple accept=".csv, .xlsx, .xls" style="display:none">
+            </div>
+            <div id="fileList" style="text-align:right; margin-bottom:20px;"></div>
+            <div class="loader" id="loader"></div>
+            <button class="generate-btn" id="generateBtn" onclick="uploadFiles()"><i class="fas fa-magic"></i> צור דשבורד</button>
+        </div>
+    </div>
+
+    <div id="dashboardView">
+        <div class="top-bar">
+            <div class="app-brand"><i class="fas fa-layer-group"></i> AgencyOS 360</div>
+            <div class="top-actions">
+                <button class="btn-pdf" onclick="downloadActiveReport()"><i class="fas fa-file-download"></i> הורד PDF מלא</button>
+                <button class="btn-print" onclick="printActiveReport()"><i class="fas fa-print"></i> הדפסה</button>
+                <button onclick="location.reload()"><i class="fas fa-sync"></i> חדש</button>
+            </div>
+        </div>
+        <div class="tabs-container" id="tabsContainer"></div>
+        <div class="content-area" id="contentArea"></div>
+    </div>
+
+    <script>
+        const uploadView = document.getElementById('uploadView');
+        const dashboardView = document.getElementById('dashboardView');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const generateBtn = document.getElementById('generateBtn');
+        const loader = document.getElementById('loader');
+        const tabsContainer = document.getElementById('tabsContainer');
+        const contentArea = document.getElementById('contentArea');
+
+        let reportsData = []; 
+        let activeReportIndex = 0;
+
+        fileInput.addEventListener('change', () => {
+            fileList.innerHTML = '';
+            if (fileInput.files.length > 0) {
+                generateBtn.style.display = 'inline-block';
+                Array.from(fileInput.files).forEach(file => fileList.innerHTML += `<div><i class="fas fa-check" style="color:#10b981"></i> ${file.name}</div>`);
+            }
+        });
+
+        async function uploadFiles() {
+            if (fileInput.files.length === 0) return;
+            generateBtn.style.display = 'none'; loader.style.display = 'block';
+            const formData = new FormData();
+            for (const file of fileInput.files) formData.append('files[]', file);
+
+            try {
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (!data || data.length === 0) { alert('לא נמצאו נתונים.'); location.reload(); return; }
+                reportsData = data; initDashboard(data);
+            } catch (error) { console.error(error); alert('שגיאה'); location.reload(); }
+        }
+
+        function initDashboard(data) {
+            uploadView.style.display = 'none'; dashboardView.style.display = 'flex';
+            tabsContainer.innerHTML = ''; contentArea.innerHTML = '';
+
+            data.forEach((report, index) => {
+                const tab = document.createElement('button');
+                tab.className = `tab-btn ${index === 0 ? 'active' : ''}`;
+                tab.innerText = report.family;
+                tab.onclick = () => switchTab(index);
+                tabsContainer.appendChild(tab);
+
+                const iframe = document.createElement('iframe');
+                iframe.id = `report-frame-${index}`;
+                iframe.style.display = index === 0 ? 'block' : 'none';
+                contentArea.appendChild(iframe);
+                
+                const doc = iframe.contentWindow.document;
+                doc.open(); doc.write(report.html); doc.close();
+            });
+            activeReportIndex = 0;
+        }
+
+        function switchTab(activeIndex) {
+            document.querySelectorAll('.tab-btn').forEach((t, i) => t.classList.toggle('active', i === activeIndex));
+            document.querySelectorAll('iframe').forEach((f, i) => f.style.display = i === activeIndex ? 'block' : 'none');
+            activeReportIndex = activeIndex;
+        }
+
+        function printActiveReport() {
+            const activeFrame = document.getElementById(`report-frame-${activeReportIndex}`);
+            if (activeFrame) activeFrame.contentWindow.print();
+        }
+
+        function downloadActiveReport() {
+    const activeFrame = document.getElementById(`report-frame-${activeReportIndex}`);
+    if (!activeFrame) return;
+
+    // שליפת שם המשפחה לשם הקובץ
+    const reports = typeof reportsData !== 'undefined' ? reportsData : [];
+    const familyName = (reports[activeReportIndex] && reports[activeReportIndex].family) || "דוח";
+    
+    const btn = document.querySelector('.btn-pdf');
+    const originalText = btn.innerHTML;
+    
+    // חיווי למשתמש
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מכין קובץ...';
+    btn.disabled = true;
+
+    // 1. שכפול התוכן מתוך ה-iframe
+    const iframeDoc = activeFrame.contentDocument || activeFrame.contentWindow.document;
+    const originalBody = iframeDoc.body;
+    const clonedBody = originalBody.cloneNode(true);
+
+    // 2. טיפול בקנבסים (גרפים) - המרה לתמונות כדי שיופיעו ב-PDF
+    const originalCanvases = originalBody.querySelectorAll('canvas');
+    const clonedCanvases = clonedBody.querySelectorAll('canvas');
+    originalCanvases.forEach((orig, i) => {
+        if (clonedCanvases[i]) {
+            const img = document.createElement('img');
+            img.src = orig.toDataURL();
+            img.style.width = '100%';
+            clonedCanvases[i].parentNode.replaceChild(img, clonedCanvases[i]);
+        }
+    });
+
+    // 3. יצירת קונטיינר זמני נסתר ליצירת ה-PDF
+    const container = document.createElement('div');
+    // העתקת ה-HEAD כדי לשמור על הפונטים והעיצוב
+    container.innerHTML = iframeDoc.head.innerHTML;
+    
+    const contentWrapper = document.createElement('div');
+    contentWrapper.className = 'pdf-export-wrapper'; // מחלקה ייעודית
+    contentWrapper.appendChild(clonedBody);
+    container.appendChild(contentWrapper);
+
+    // --- התיקון הקריטי: CSS שדורס את הגדרות המסך ---
+    const styleFix = document.createElement('style');
+    styleFix.innerHTML = `
+        /* איפוס כללי כדי למנוע שוליים לבנים מיותרים */
+        body, html { margin: 0 !important; padding: 0 !important; background: #fff !important; width: 100% !important; height: auto !important; }
+        
+        /* ביטול הגבלות הגודל של הקונטיינר המקורי */
+        .page-container { 
+            width: 100% !important; 
+            max-width: 100% !important;
+            margin: 0 !important; 
+            padding: 0 !important; 
+            box-shadow: none !important; 
+            border: none !important;
+            min-height: auto !important; /* קריטי: נותן לתוכן לקבוע את האורך */
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        /* הגדרת רוחב אופטימלי ל-PDF כדי למנוע חיתוך צדדי */
+        .pdf-export-wrapper {
+            width: 190mm; /* קצת פחות מ-A4 כדי להשאיר מקום לשוליים */
+            margin: 0 auto;
+            background: white;
+        }
+
+        /* הסתרת אלמנטים לא רצויים */
+        .no-print, #loadingMsg { display: none !important; }
+        
+        /* שיפור תצוגת טבלאות למניעת שבירה */
+        table { page-break-inside: auto; width: 100% !important; layout: fixed; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
+        thead { display: table-header-group; }
+        tfoot { display: table-footer-group; }
+        
+        /* מניעת חיתוך של כרטיסים ואלמנטים חשובים */
+        .kpi-container, .check-card, .mem-item, .sec-title {
+            page-break-inside: avoid;
+        }
+    `;
+    container.appendChild(styleFix);
+
+    // מיקום הקונטיינר מחוץ למסך (כדי שהמשתמש לא יראה את התהליך)
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    document.body.appendChild(container);
+
+    // 4. הגדרות הספרייה html2pdf
+    const opt = {
+        margin:       [10, 10, 10, 10], // שוליים: למעלה, ימין, למטה, שמאל (במ"מ)
+        filename:     `סיכום_תיק_${familyName}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { 
+            scale: 2, // איכות גבוהה (מונע טקסט מטושטש)
+            useCORS: true, 
+            logging: false,
+            letterRendering: true, 
+            scrollY: 0
+        },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        // --- הגדרה קריטית למניעת חיתוך אלמנטים באמצע ---
+        pagebreak:    { 
+            mode: ['css', 'legacy'], 
+            // רשימת אלמנטים שאסור לחתוך באמצע
+            avoid: ['tr', '.kpi-container', '.sec-title', '.check-card', '.mem-item', '.header'] 
+        }
+    };
+
+    // ביצוע ההמרה
+    setTimeout(() => {
+        html2pdf().set(opt).from(contentWrapper).save().then(() => {
+            // ניקוי לאחר סיום
+            document.body.removeChild(container);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }).catch(err => {
+            console.error(err);
+            alert("שגיאה ביצירת PDF");
+            if (document.body.contains(container)) document.body.removeChild(container);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    }, 500); // השהייה קטנה לוודא שהכל נטען
+}
+    </script>
+</body>
+</html>

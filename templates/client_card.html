@@ -1,0 +1,37 @@
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+    <div>
+        <button class="btn btn-light rounded-circle me-2" onclick="App.router('dashboard')"><i class="fas fa-arrow-right"></i></button>
+        <span class="fs-2 fw-bold align-middle" id="client-name">שם לקוח</span>
+    </div>
+    <button class="btn-pink rounded-pill px-4" onclick="window.print()" style="width:auto; margin:0;">
+        <i class="fas fa-file-pdf me-2"></i>הפקת דוח PDF
+    </button>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3"><div class="card-box border-bottom border-primary border-4 py-3"><div class="stat-label">פרמיה חודשית</div><div class="stat-val" id="val-prem">0</div></div></div>
+    <div class="col-md-3"><div class="card-box border-bottom border-success border-4 py-3"><div class="stat-label">סך נכסים</div><div class="stat-val text-success" id="val-sav">0</div></div></div>
+    <div class="col-md-3"><div class="card-box border-bottom border-danger border-4 py-3"><div class="stat-label">ריסק חיים</div><div class="stat-val" id="val-risk">0</div></div></div>
+    <div class="col-md-3"><div class="card-box border-bottom border-warning border-4 py-3"><div class="stat-label">מוצרים</div><div class="stat-val" id="val-count">0</div></div></div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6"><div class="card-box" style="height:350px"><canvas id="chartPie"></canvas></div></div>
+    <div class="col-md-6"><div class="card-box" style="height:350px"><canvas id="chartBar"></canvas></div></div>
+</div>
+
+<div class="card-box mb-4">
+    <h5 class="fw-bold text-primary mb-3">תיק ביטוחי</h5>
+    <table class="styled-table w-100">
+        <thead><tr><th>סוג</th><th>חברה</th><th>פרמיה</th><th>כיסוי</th><th>הערות</th></tr></thead>
+        <tbody id="tbody-ins"></tbody>
+    </table>
+</div>
+
+<div class="card-box">
+    <h5 class="fw-bold text-success mb-3">פיננסים ופנסיה</h5>
+    <table class="styled-table w-100">
+        <thead><tr><th>מוצר</th><th>חברה</th><th>צבירה</th><th>דמי ניהול</th><th>המלצות</th></tr></thead>
+        <tbody id="tbody-fin"></tbody>
+    </table>
+</div>

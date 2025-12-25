@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgencyOS - מערכת ניהול סוכנות</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --accent: #f72585; /* ורוד פוקסיה */
+            --bg: #f8fafc;
+            --sidebar-w: 260px;
+            --card-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+
+        body { background: var(--bg); font-family: 'Heebo', sans-serif; height: 100vh; overflow: hidden; margin: 0; }
+
+        /* Login */
+        #loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: rgba(255,255,255,0.95); padding: 50px; border-radius: 24px; width: 400px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .btn-pink { background: var(--accent); color: white; border: none; padding: 12px; width: 100%; border-radius: 50px; font-weight: bold; font-size: 1.1rem; margin-top: 20px; transition: 0.3s; box-shadow: 0 4px 15px rgba(247, 37, 133, 0.4); }
+        .btn-pink:hover { background: #b5179e; transform: translateY(-2px); }
+
+        /* Layout */
+        #appLayout { display: none; height: 100vh; display: flex; }
+        .sidebar { width: var(--sidebar-w); background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; padding: 25px; min-width: 260px; z-index: 100; box-shadow: 5px 0 15px rgba(0,0,0,0.02); }
+        .content { flex: 1; padding: 30px; overflow-y: auto; background: #f1f5f9; position: relative; }
+        
+        .nav-item { padding: 14px; margin-bottom: 8px; cursor: pointer; border-radius: 12px; color: #64748b; display: flex; gap: 12px; align-items: center; font-weight: 500; transition: 0.2s; }
+        .nav-item:hover, .nav-item.active { background: #eef2ff; color: var(--primary); }
+        .nav-item i { width: 24px; text-align: center; font-size: 1.2rem; }
+
+        /* Cards */
+        .card-box { background: white; border-radius: 20px; padding: 25px; box-shadow: var(--card-shadow); margin-bottom: 20px; border: 1px solid #f1f5f9; transition: 0.3s; }
+        .card-box:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        
+        .stat-val { font-size: 2rem; font-weight: 800; color: #1e293b; }
+        .stat-label { font-size: 0.85rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Family Card */
+        .family-card { cursor: pointer; border-right: 4px solid transparent; }
+        .family-card:hover { border-right-color: var(--primary); }
+
+        /* Modal (Upload Popup) */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000;
+            display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            background: white; width: 600px; padding: 40px; border-radius: 24px; text-align: center; position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+        .drop-zone {
+            border: 3px dashed #cbd5e1; border-radius: 20px; padding: 50px; margin: 20px 0;
+            cursor: pointer; transition: 0.3s; background: #f8fafc;
+        }
+        .drop-zone:hover { border-color: var(--primary); background: #eff6ff; }
+        .close-btn { position: absolute; top: 20px; right: 20px; cursor: pointer; font-size: 1.5rem; color: #94a3b8; }
+
+        /* Tables */
+        .styled-table { width: 100%; border-collapse: collapse; }
+        .styled-table th { background: #f8fafc; padding: 15px; text-align: right; color: #475569; border-bottom: 2px solid #e2e8f0; }
+        .styled-table td { padding: 15px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .styled-table tr:hover { background: #f8fafc; }
+
+        /* Print */
+        @media print {
+            body { background: white; }
+            #sidebar, #loginScreen, .no-print, .btn, .modal-overlay { display: none !important; }
+            #clientView { display: block !important; position: absolute; top: 0; left: 0; width: 100%; z-index: 5000; background: white; }
+            .card-box { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+            .pdf-cover { 
+                height: 100vh; display: flex !important; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+                background: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%); page-break-after: always;
+            }
+        }
+        .pdf-cover { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="loginScreen">
+        <div class="login-card">
+            <img src="logo.png" style="height: 80px; margin-bottom: 20px;" onerror="this.style.display='none'; document.getElementById('defIcon').style.display='block'">
+            <i id="defIcon" class="fas fa-shield-alt fa-4x text-primary mb-3" style="display:none; margin:0 auto;"></i>
+            <h2 class="fw-bold mb-1">AgencyOS</h2>
+            <p class="text-muted mb-4">כניסה למערכת</p>
+            <input type="text" id="user" class="form-control mb-3 p-3 rounded-pill text-center" placeholder="שם משתמש">
+            <input type="password" id="pass" class="form-control mb-3 p-3 rounded-pill text-center" placeholder="סיסמה">
+            <button class="btn-pink" onclick="login()">התחברות</button>
+        </div>
+    </div>
+
+    <div id="appLayout">
+        
+        <nav class="sidebar">
+            <div class="text-center mb-5 cursor-pointer" onclick="router('home')">
+                <img src="logo.png" style="height: 50px;" onerror="this.style.display='none'">
+                <h4 class="m-0 fw-bold mt-2 text-primary">AgencyOS</h4>
+            </div>
+            
+            <div class="nav-item active" id="nav-home" onclick="router('home')">
+                <i class="fas fa-home"></i> ראשי
+            </div>
+            <div class="nav-item" id="nav-families" onclick="router('families')">
+                <i class="fas fa-users"></i> תיקים משפחתיים
+            </div>
+            
+            <div class="nav-item" onclick="openUploadModal()">
+                <i class="fas fa-cloud-upload-alt text-success"></i> <span class="fw-bold text-success">טעינת נתונים</span>
+            </div>
+            
+            <div style="margin-top: auto;">
+                <div class="nav-item text-danger" onclick="location.reload()">
+                    <i class="fas fa-sign-out-alt"></i> יציאה
+                </div>
+            </div>
+        </nav>
+
+        <main class="content">
+            
+            <div id="view-home">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold m-0">מרכז שליטה</h2>
+                    <span class="text-muted">שלום, <span id="welcomeUser">Admin</span></span>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <div class="card-box text-center h-100">
+                            <div class="stat-val text-primary" id="kpi-fams">0</div>
+                            <div class="stat-label">משפחות בטיפול</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card-box text-center h-100">
+                            <div class="stat-val text-success" id="kpi-aum">₪0</div>
+                            <div class="stat-label">סך נכסים מנוהל</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card-box text-center h-100">
+                            <div class="stat-val text-danger" id="kpi-prem">₪0</div>
+                            <div class="stat-label">פרמיה חודשית</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-md-8">
+                        <div class="card-box" style="height: 400px;">
+                            <h5 class="fw-bold mb-4">ביצועים (דמו)</h5>
+                            <canvas id="mainChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card-box" style="height: 400px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+                            <i class="fas fa-file-import fa-3x text-muted mb-3"></i>
+                            <h5 class="text-center">יש לטעון קבצים<br>כדי לראות נתונים</h5>
+                            <button class="btn btn-primary rounded-pill mt-3" onclick="openUploadModal()">פתח חלונית טעינה</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-families" style="display: none;">
+                <h2 class="fw-bold mb-4">תיקים משפחתיים</h2>
+                <div class="card-box">
+                    <input type="text" id="searchBox" class="form-control form-control-lg border-0 bg-light mb-4" placeholder="חיפוש משפחה..." onkeyup="renderFamilies()">
+                    <div id="families-grid" class="row g-4"></div>
+                </div>
+            </div>
+
+            <div id="clientView" style="display: none;">
+                
+                <div class="pdf-cover">
+                    <img src="logo.png" style="height: 120px; margin-bottom: 30px;" onerror="this.style.display='none'">
+                    <h1 style="font-size: 4rem; font-weight: 900; color: #1e293b;">תיק לקוח מסכם</h1>
+                    <h2 class="text-primary mt-4 mb-5" style="font-size: 2.5rem;" id="pdfClientName"></h2>
+                    <div style="font-size: 1.5rem; color: #64748b;">
+                        <p>דוח מצב ביטוחי ופיננסי</p>
+                        <p id="pdfDate"></p>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-4 no-print bg-white p-3 rounded-4 shadow-sm border">
+                    <div class="d-flex align-items-center gap-3">
+                        <button class="btn btn-light rounded-circle" onclick="router('families')"><i class="fas fa-arrow-right"></i></button>
+                        <div>
+                            <h2 class="fw-bold m-0" id="p-name">שם הלקוח</h2>
+                            <small class="text-muted" id="p-members"></small>
+                        </div>
+                    </div>
+                    <button class="btn btn-dark rounded-pill" onclick="window.print()"><i class="fas fa-print me-2"></i>הדפס PDF</button>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-3"><div class="card-box border-bottom border-primary border-4 py-3"><div class="stat-label">פרמיה חודשית</div><div class="stat-val" id="p-prem">₪0</div></div></div>
+                    <div class="col-md-3"><div class="card-box border-bottom border-success border-4 py-3"><div class="stat-label">סך צבירה</div><div class="stat-val text-success" id="p-sav">₪0</div></div></div>
+                    <div class="col-md-3"><div class="card-box border-bottom border-danger border-4 py-3"><div class="stat-label">ריסק למקרה מוות</div><div class="stat-val" id="p-risk">₪0</div></div></div>
+                    <div class="col-md-3"><div class="card-box border-bottom border-warning border-4 py-3"><div class="stat-label">מספר מוצרים</div><div class="stat-val" id="p-count">0</div></div></div>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-6"><div class="card-box" style="height:350px"><canvas id="chartPie"></canvas></div></div>
+                    <div class="col-md-6"><div class="card-box" style="height:350px"><canvas id="chartBar"></canvas></div></div>
+                </div>
+
+                <div id="members-details-area"></div>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="uploadModal" class="modal-overlay">
+        <div class="modal-content">
+            <i class="fas fa-times close-btn" onclick="closeUploadModal()"></i>
+            <h3 class="fw-bold mb-3">טעינת קבצים למערכת</h3>
+            <p class="text-muted">ניתן לבחור מספר קבצים בו זמנית (אקסל/CSV)</p>
+            
+            <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                <h5>לחץ כאן לבחירת קבצים</h5>
+            </div>
+            
+            <div class="text-start bg-light p-3 rounded small text-muted">
+                <i class="fas fa-info-circle me-1"></i> המערכת תזהה אוטומטית משפחות לפי שמות הקבצים ותאחד נתונים.
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" multiple accept=".csv, .xlsx, .xls" style="display: none;" onchange="processFiles(this.files)">
+
+    <script>
+        // --- State ---
+        let Families = {};
+        let currentFamilyKey = null;
+        let ChartP = null, ChartB = null, MainChart = null;
+
+        // --- Auth ---
+        document.getElementById('pass').addEventListener('keypress', e => { if(e.key==='Enter') login(); });
+        
+        function login() {
+            const u = document.getElementById('user').value || 'Admin';
+            const p = document.getElementById('pass').value;
+            if(p === '123456') {
+                document.getElementById('loginScreen').style.display='none';
+                document.getElementById('appLayout').style.display='flex';
+                document.getElementById('welcomeUser').innerText = u;
+                initMainChart();
+                
+                if(document.querySelector('.login-card img').style.display === 'none') {
+                    document.getElementById('defIcon').style.display='block';
+                }
+            } else Swal.fire('שגיאה','סיסמה שגויה','error');
+        }
+
+        // --- Router ---
+        function router(view) {
+            ['view-home','view-families','clientView'].forEach(id => document.getElementById(id).style.display='none');
+            document.getElementById(view === 'profile' ? 'clientView' : 'view-'+view).style.display='block';
+            
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            const navId = view === 'profile' ? 'nav-families' : 'nav-'+view;
+            if(document.getElementById(navId)) document.getElementById(navId).classList.add('active');
+        }
+
+        // --- Modal Logic ---
+        function openUploadModal() { document.getElementById('uploadModal').style.display = 'flex'; }
+        function closeUploadModal() { document.getElementById('uploadModal').style.display = 'none'; }
+
+        // --- File Engine ---
+        async function processFiles(files) {
+            closeUploadModal();
+            if(!files.length) return;
+            Swal.fire({title:'מפענח ומסדר נתונים...', html:'בונה תיקים משפחתיים...', didOpen:()=>Swal.showLoading()});
+            
+            let count = 0;
+            for(let f of files) {
+                // זיהוי שם משפחה משם הקובץ
+                let familyName = f.name.replace(/\.(xlsx|xls|csv)$/i, '')
+                                       .replace(/ניתוח תיק.*/, '')
+                                       .replace(/ניהול סיכונים.*/, '')
+                                       .replace(/פרטים אישיים.*/, '')
+                                       .replace(/ביטוחים.*/, '')
+                                       .replace(/פנסיה.*/, '')
+                                       .replace(/[0-9-]/g, '')
+                                       .trim();
+                
+                if(!Families[familyName]) Families[familyName] = { members: {}, rawFiles: [] };
+                await readFile(f, familyName);
+                count++;
+            }
+            
+            updateHomeStats();
+            Swal.fire('הצלחה', `נקלטו ${count} קבצים ל-${Object.keys(Families).length} משפחות`, 'success');
+        }
+
+        function readFile(file, familyKey) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+                        wb.SheetNames.forEach(n => parseSheet(XLSX.utils.sheet_to_json(wb.Sheets[n], {header: 1}), familyKey));
+                    } catch(err) {}
+                    resolve();
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function parseSheet(rows, fKey) {
+            if(!rows || rows.length < 2) return;
+
+            let hIdx = -1, type = null;
+            // זיהוי חכם
+            for(let i=0; i<Math.min(rows.length, 50); i++) {
+                const r = rows[i].join(" ").trim();
+                if(r.includes("סכום פיצוי") && (r.includes("מבוטחים") || r.includes("שם"))) { hIdx=i; type='ins'; break; }
+                else if(r.includes("צבירה") && r.includes("דמי ניהול")) { hIdx=i; type='fin'; break; }
+                else if(r.includes("גיל") && r.includes("עיסוק")) { hIdx=i; type='det'; break; }
+            }
+
+            if(hIdx === -1) return;
+
+            const headers = rows[hIdx].map(x => x ? x.toString().trim() : "");
+            
+            for(let i=hIdx+1; i<rows.length; i++) {
+                const r = rows[i];
+                if(!r.length) continue;
+                let d={}; headers.forEach((h,x)=>d[h]=r[x]);
+
+                let rawName = d['שם'] || d['מבוטחים'] || d['לקוח'] || d['לקוח '] || r[0];
+                if(!rawName || typeof rawName!=='string' || rawName.length<2 || rawName.includes("סה\"כ")) continue;
+                
+                // טיפול בריבוי שמות בשורה
+                let names = rawName.split(/[,&]/).map(n=>n.trim());
+                
+                names.forEach(name => {
+                    if(!name || !isNaN(parseFloat(name))) return;
+
+                    if(!Families[fKey].members[name]) Families[fKey].members[name] = { ins:[], fin:[], details:{} };
+                    const mem = Families[fKey].members[name];
+
+                    if(type==='ins') {
+                        if(!d['ביטוח'] && !d['שם כיסוי']) return;
+                        mem.ins.push({
+                            type: d['ביטוח']||d['שם כיסוי'], co: d['חברה']||"", cost: pNum(d['עלות']), cov: pNum(d['סכום פיצוי']), note: d['הערות']||""
+                        });
+                    } else if(type==='fin') {
+                        if(!d['מוצר']) return;
+                        mem.fin.push({
+                            prod: d['מוצר'], co: d['חברה']||"", bal: pNum(d['צבירה']), fee: d['דמי ניהול']||"", rec: d['המלצות']||""
+                        });
+                    } else if(type==='det') {
+                        mem.details = { age: d['גיל'], job: d['עיסוק'], status: d['סטטוס'] };
+                    }
+                });
+            }
+        }
+        function pNum(v){ return parseFloat((v||0).toString().replace(/[^\d.-]/g,''))||0; }
+
+        // --- Logic & View ---
+        function updateHomeStats() {
+            const fams = Object.values(Families);
+            document.getElementById('kpi-fams').innerText = fams.length;
+            
+            let totalAum=0, totalPrem=0;
+            fams.forEach(f => Object.values(f.members).forEach(m => {
+                totalAum += m.fin.reduce((s,x)=>s+x.bal,0);
+                totalPrem += m.ins.reduce((s,x)=>s+x.cost,0);
+            }));
+            
+            document.getElementById('kpi-aum').innerText = '₪'+totalAum.toLocaleString();
+            document.getElementById('kpi-prem').innerText = '₪'+totalPrem.toLocaleString();
+        }
+
+        function renderFamilies() {
+            const q = document.getElementById('searchBox').value.toLowerCase();
+            const grid = document.getElementById('families-grid');
+            grid.innerHTML = '';
+
+            Object.keys(Families).filter(k => k.toLowerCase().includes(q)).forEach(fName => {
+                const fam = Families[fName];
+                const members = Object.keys(fam.members);
+                
+                let fPrem=0, fSav=0;
+                members.forEach(m => {
+                    fPrem += fam.members[m].ins.reduce((s,i)=>s+i.cost,0);
+                    fSav += fam.members[m].fin.reduce((s,i)=>s+i.bal,0);
+                });
+
+                const div = document.createElement('div');
+                div.className = 'col-md-4';
+                div.innerHTML = `
+                    <div class="card-box family-card" onclick="loadFamily('${fName}')">
+                        <div class="d-flex justify-content-between mb-3">
+                            <h4 class="fw-bold m-0 text-primary">${fName}</h4>
+                            <i class="fas fa-users text-muted"></i>
+                        </div>
+                        <div class="mb-3 text-muted small">
+                            ${members.join(', ')}
+                        </div>
+                        <div class="row text-center mt-3 pt-3 border-top">
+                            <div class="col">
+                                <div class="stat-label">פרמיה</div>
+                                <div class="fw-bold">₪${fPrem.toLocaleString()}</div>
+                            </div>
+                            <div class="col">
+                                <div class="stat-label">נכסים</div>
+                                <div class="fw-bold text-success">₪${fSav.toLocaleString()}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        function loadFamily(fName) {
+            router('profile');
+            const fam = Families[fName];
+            
+            document.getElementById('p-name').innerText = "משפחת " + fName;
+            document.getElementById('pdfClientName').innerText = fName;
+            document.getElementById('p-members').innerText = "מבוטחים: " + Object.keys(fam.members).join(', ');
+
+            let tPrem=0, tSav=0, tRisk=0, tCount=0;
+            const container = document.getElementById('members-details-area');
+            container.innerHTML = '';
+
+            Object.keys(fam.members).forEach(mName => {
+                const m = fam.members[mName];
+                // אם אין נתונים, לא נציג
+                if(m.ins.length === 0 && m.fin.length === 0) return;
+
+                const prem = m.ins.reduce((s,x)=>s+x.cost,0);
+                const sav = m.fin.reduce((s,x)=>s+x.bal,0);
+                const risk = m.ins.filter(i=>i.type.includes('חיים')||i.type.includes('ריסק')).reduce((s,x)=>s+x.cov,0);
+                
+                tPrem += prem; tSav += sav; tRisk += risk; tCount += (m.ins.length + m.fin.length);
+
+                // יצירת טבלאות לכל מבוטח
+                let html = `
+                    <div class="card-box mt-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                            <h3 class="fw-bold text-primary m-0"><i class="fas fa-user me-2"></i>${mName}</h3>
+                            <div class="d-flex gap-3">
+                                <span class="badge bg-light text-dark border p-2">פרמיה: ₪${prem.toLocaleString()}</span>
+                                <span class="badge bg-light text-dark border p-2">צבירה: ₪${sav.toLocaleString()}</span>
+                            </div>
+                        </div>`;
+
+                if(m.ins.length) {
+                    html += `<h5 class="fw-bold text-secondary mb-2">ביטוחים</h5>
+                    <div class="table-responsive mb-4"><table class="styled-table"><thead class="bg-light"><tr><th>סוג</th><th>חברה</th><th>פרמיה</th><th>כיסוי</th><th>הערות</th></tr></thead><tbody>
+                    ${m.ins.map(i=>`<tr><td>${i.type}</td><td>${i.co}</td><td>₪${i.cost}</td><td>₪${i.cov.toLocaleString()}</td><td class="small text-muted">${i.note}</td></tr>`).join('')}
+                    </tbody></table></div>`;
+                }
+
+                if(m.fin.length) {
+                    html += `<h5 class="fw-bold text-success mb-2">פיננסים</h5>
+                    <div class="table-responsive"><table class="styled-table"><thead class="bg-light"><tr><th>מוצר</th><th>חברה</th><th>צבירה</th><th>דמי ניהול</th></tr></thead><tbody>
+                    ${m.fin.map(f=>`<tr><td>${f.prod}</td><td>${f.co}</td><td class="fw-bold text-dark">₪${f.bal.toLocaleString()}</td><td>${f.fee}</td></tr>`).join('')}
+                    </tbody></table></div>`;
+                }
+                
+                html += `</div>`;
+                container.innerHTML += html;
+            });
+
+            document.getElementById('p-prem').innerText = '₪' + tPrem.toLocaleString();
+            document.getElementById('p-sav').innerText = '₪' + tSav.toLocaleString();
+            document.getElementById('p-risk').innerText = '₪' + tRisk.toLocaleString();
+            document.getElementById('p-count').innerText = tCount;
+
+            renderCharts(tPrem, tSav);
+        }
+
+        function renderCharts(prem, sav) {
+            const ctxP = document.getElementById('chartPie').getContext('2d');
+            if(ChartP) ChartP.destroy();
+            ChartP = new Chart(ctxP, {
+                type: 'doughnut',
+                data: {
+                    labels: ['נכסים', 'עלות ביטוח שנתית'],
+                    datasets: [{ data: [sav, prem*12], backgroundColor: ['#4f46e5', '#db2777'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const ctxB = document.getElementById('chartBar').getContext('2d');
+            if(ChartB) ChartB.destroy();
+            ChartB = new Chart(ctxB, {
+                type: 'bar',
+                data: {
+                    labels: ['נכסים', 'ביטוח'],
+                    datasets: [{ label: 'שווי בש"ח', data: [sav, prem*12], backgroundColor: ['#10b981', '#f59e0b'], borderRadius: 5 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function initMainChart() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['ינואר','פברואר','מרץ','אפריל','מאי','יוני'],
+                    datasets: [{
+                        label: 'צמיחת תיק (דמו)',
+                        data: [100, 120, 150, 170, 180, 200],
+                        borderColor: '#4f46e5',
+                        tension: 0.4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // Print
+        function printReport() {
+            document.getElementById('pdfDate').innerText = new Date().toLocaleDateString('he-IL');
+            window.print();
+        }
+
+    </script>
+</body>
+</html>

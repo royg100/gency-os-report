@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgencyOS - ניהול תא משפחתי (נקי)</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #4361ee;
+            --accent: #f72585;
+            --bg: #f8fafc;
+            --sidebar-w: 280px;
+        }
+
+        body { background: var(--bg); font-family: 'Heebo', sans-serif; height: 100vh; overflow: hidden; margin: 0; }
+
+        /* Login */
+        #loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #10002b 0%, #240046 100%); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: rgba(255,255,255,0.95); padding: 50px; border-radius: 30px; width: 420px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .btn-pink { background: var(--accent); color: white; border: none; padding: 15px; width: 100%; border-radius: 50px; font-weight: bold; font-size: 1.1rem; margin-top: 20px; transition: 0.3s; box-shadow: 0 4px 15px rgba(247, 37, 133, 0.4); }
+        .btn-pink:hover { background: #b5179e; transform: scale(1.02); }
+
+        /* Layout */
+        #appLayout { display: none; height: 100vh; display: flex; }
+        .sidebar { width: var(--sidebar-w); background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; padding: 25px; min-width: 280px; z-index: 100; box-shadow: 5px 0 15px rgba(0,0,0,0.02); }
+        .content { flex: 1; padding: 30px; overflow-y: auto; background: #f8fafc; position: relative; }
+        
+        .nav-item { padding: 15px; margin-bottom: 8px; cursor: pointer; border-radius: 12px; color: #64748b; display: flex; gap: 15px; align-items: center; font-weight: 500; transition: 0.2s; }
+        .nav-item:hover, .nav-item.active { background: #eff6ff; color: var(--primary); }
+        .nav-item i { width: 25px; text-align: center; font-size: 1.2rem; }
+
+        /* Family Cards */
+        .family-card { 
+            background: white; border-radius: 20px; padding: 25px; transition: 0.3s; cursor: pointer;
+            border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); position: relative; overflow: hidden;
+        }
+        .family-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .family-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--primary); }
+        
+        .stat-val { font-size: 1.5rem; font-weight: 800; color: #1e293b; }
+        .stat-label { font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase; }
+
+        /* Upload Hero */
+        .upload-hero { border: 3px dashed #cbd5e1; padding: 60px; text-align: center; border-radius: 24px; cursor: pointer; background: white; transition: 0.3s; max-width: 900px; margin: 40px auto; }
+        .upload-hero:hover { border-color: var(--primary); background: #f0f9ff; transform: scale(1.01); }
+
+        /* Family View Internal */
+        .member-tab { padding: 10px 20px; border-radius: 50px; cursor: pointer; background: #f1f5f9; color: #64748b; font-weight: 500; transition: 0.2s; }
+        .member-tab.active { background: var(--primary); color: white; }
+        .member-tab:hover:not(.active) { background: #e2e8f0; }
+
+        .styled-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .styled-table th { background: #f8fafc; padding: 15px; text-align: right; color: #475569; border-bottom: 2px solid #e2e8f0; font-weight: 700; }
+        .styled-table td { padding: 15px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .styled-table tr:hover { background: #f8fafc; }
+
+        /* Print */
+        @media print {
+            body { background: white; }
+            #sidebar, #loginScreen, .no-print, .btn, .upload-hero, .nav-pills { display: none !important; }
+            #familyView { display: block !important; position: absolute; top: 0; left: 0; width: 100%; z-index: 5000; background: white; }
+            .family-card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+            .chart-container { height: 300px; page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loginScreen">
+        <div class="login-card">
+            <img src="logo.png" style="height: 70px; margin-bottom: 20px;" onerror="this.style.display='none'; document.getElementById('defIcon').style.display='block'">
+            <i id="defIcon" class="fas fa-shield-alt fa-4x text-primary mb-3" style="display:none; margin:0 auto;"></i>
+            <h2 class="fw-bold mb-1">AgencyOS</h2>
+            <p class="text-muted mb-4">ניהול תא משפחתי V20</p>
+            <input type="password" id="pass" class="form-control mb-3 p-3 rounded-pill text-center" placeholder="123456">
+            <button class="btn-pink" onclick="login()">כניסה</button>
+        </div>
+    </div>
+
+    <div id="appLayout">
+        <nav class="sidebar">
+            <div class="text-center mb-5 cursor-pointer" onclick="router('home')">
+                <img src="logo.png" style="height: 50px;" onerror="this.style.display='none'">
+                <h4 class="m-0 fw-bold mt-2 text-primary">AgencyOS</h4>
+            </div>
+            <div class="nav-item active" onclick="router('home')"><i class="fas fa-home"></i> ראשי</div>
+            <div class="nav-item" onclick="router('families')"><i class="fas fa-users"></i> תיקים משפחתיים</div>
+            <div class="nav-item" onclick="triggerUpload()"><i class="fas fa-cloud-upload-alt"></i> טעינת נתונים</div>
+            <div class="mt-auto nav-item text-danger" onclick="location.reload()"><i class="fas fa-sign-out-alt"></i> יציאה</div>
+        </nav>
+
+        <main class="content">
+            
+            <div id="view-home">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold m-0">מרכז שליטה</h2>
+                    <span class="badge bg-primary rounded-pill px-3 py-2">ניהול משפחתי</span>
+                </div>
+
+                <div class="upload-hero mb-5" onclick="triggerUpload()">
+                    <i class="fas fa-folder-open fa-4x text-primary mb-3"></i>
+                    <h3 class="fw-bold">טעינת תיקים משפחתיים</h3>
+                    <p class="text-muted">בחר את כל קבצי האקסל (סיכונים, פרטים, פיננסים).<br>המערכת תסנן ותאחד אותם למשפחות באופן אוטומטי.</p>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="family-card text-center" onclick="router('families')">
+                            <div class="stat-val text-primary" id="kpi-families">0</div>
+                            <div class="stat-label">משפחות במערכת</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="family-card text-center">
+                            <div class="stat-val text-success" id="kpi-aum">₪0</div>
+                            <div class="stat-label">סך נכסים מנוהל</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="family-card text-center">
+                            <div class="stat-val text-danger" id="kpi-prem">₪0</div>
+                            <div class="stat-label">פרמיה חודשית כוללת</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-families" style="display:none;">
+                <h2 class="fw-bold mb-4">תיקים משפחתיים</h2>
+                <input type="text" id="searchBox" class="form-control form-control-lg border-0 shadow-sm mb-4" placeholder="חפש משפחה..." onkeyup="renderFamilies()">
+                <div id="families-grid" class="row g-4"></div>
+            </div>
+
+            <div id="familyView" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center mb-4 no-print bg-white p-3 rounded-4 shadow-sm border">
+                    <div class="d-flex align-items-center gap-3">
+                        <button class="btn btn-light rounded-circle" onclick="router('families')"><i class="fas fa-arrow-right"></i></button>
+                        <div>
+                            <h2 class="fw-bold m-0" id="f-name">משפחת ישראלי</h2>
+                            <small class="text-muted" id="f-members-list"></small>
+                        </div>
+                    </div>
+                    <button class="btn btn-dark rounded-pill" onclick="window.print()"><i class="fas fa-print me-2"></i>הדפס דוח משפחתי</button>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3"><div class="bg-white p-3 rounded-4 shadow-sm border-bottom border-primary border-4"><div class="text-muted small fw-bold">הוצאה חודשית</div><div class="fs-3 fw-bold" id="f-prem">0</div></div></div>
+                    <div class="col-md-3"><div class="bg-white p-3 rounded-4 shadow-sm border-bottom border-success border-4"><div class="text-muted small fw-bold">נכסים וחסכונות</div><div class="fs-3 fw-bold text-success" id="f-sav">0</div></div></div>
+                    <div class="col-md-3"><div class="bg-white p-3 rounded-4 shadow-sm border-bottom border-danger border-4"><div class="text-muted small fw-bold">סך כיסוי חיים</div><div class="fs-3 fw-bold" id="f-risk">0</div></div></div>
+                    <div class="col-md-3"><div class="bg-white p-3 rounded-4 shadow-sm border-bottom border-warning border-4"><div class="text-muted small fw-bold">מוצרים פעילים</div><div class="fs-3 fw-bold" id="f-count">0</div></div></div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <div class="bg-white p-4 rounded-4 shadow-sm h-100">
+                            <h5 class="fw-bold mb-3">ניתוח ותובנות מערכת</h5>
+                            <div id="f-insights"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="bg-white p-4 rounded-4 shadow-sm h-100 chart-container">
+                            <h5 class="fw-bold mb-3 text-center">התפלגות נכסים</h5>
+                            <canvas id="famPie"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mb-4 overflow-auto no-print" id="members-tabs"></div>
+
+                <div id="member-details-container"></div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <input type="file" id="fileInput" multiple style="display:none" onchange="processFiles(this.files)">
+
+    <script>
+        // --- DATA STRUCTURE ---
+        let Families = {}; 
+        let currentFamilyKey = null;
+        let famChart = null;
+
+        // --- Login ---
+        document.getElementById('pass').addEventListener('keypress', e=>{if(e.key==='Enter') login()});
+        function login() {
+            if(document.getElementById('pass').value === '123456') {
+                document.getElementById('loginScreen').style.display='none';
+                document.getElementById('appLayout').style.display='flex';
+                if(document.querySelector('.login-card img').style.display === 'none') {
+                    document.getElementById('defIcon').style.display='block';
+                }
+            } else Swal.fire('שגיאה','סיסמה שגויה','error');
+        }
+
+        // --- Router ---
+        function router(view) {
+            ['view-home','view-families','familyView'].forEach(id => document.getElementById(id).style.display='none');
+            document.getElementById(view==='profile'?'familyView':'view-'+view).style.display='block';
+        }
+
+        // --- THE ENGINE (CLEAN) ---
+        function triggerUpload() { document.getElementById('fileInput').click(); }
+
+        async function processFiles(files) {
+            if(!files.length) return;
+            Swal.fire({title:'מנתח תאים משפחתיים...', html:'מסנן ומאחד נתונים', didOpen:()=>Swal.showLoading()});
+            
+            let count = 0;
+            for(let f of files) {
+                // Heuristic: Family name from filename
+                let familyName = f.name.replace(/\.(xlsx|xls|csv)$/i, '')
+                                       .replace(/ניתוח תיק.*/, '')
+                                       .replace(/ניהול סיכונים.*/, '')
+                                       .replace(/פרטים אישיים.*/, '')
+                                       .replace(/-.*/, '')
+                                       .trim();
+                
+                if(!Families[familyName]) Families[familyName] = { members: {}, rawFiles: [] };
+                Families[familyName].rawFiles.push(f.name);
+
+                await readFile(f, familyName);
+                count++;
+            }
+            
+            updateHomeStats();
+            Swal.fire('בוצע', `עובדו ${count} קבצים ל-${Object.keys(Families).length} משפחות`, 'success').then(() => router('families'));
+        }
+
+        function readFile(file, familyKey) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+                        wb.SheetNames.forEach(n => parseSheet(XLSX.utils.sheet_to_json(wb.Sheets[n], {header: 1}), familyKey));
+                    } catch(err) {}
+                    resolve();
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function parseSheet(rows, fKey) {
+            if(!rows || rows.length < 2) return;
+
+            let hIdx = -1, type = null;
+            // Smart Scan
+            for(let i=0; i<Math.min(rows.length, 50); i++) {
+                const r = rows[i].join(" ").trim();
+                if(r.includes("סכום פיצוי") && (r.includes("מבוטחים") || r.includes("שם"))) { hIdx=i; type='ins'; break; }
+                else if(r.includes("צבירה") && r.includes("דמי ניהול")) { hIdx=i; type='fin'; break; }
+                else if(r.includes("גיל") && r.includes("עיסוק") && r.includes("סטטוס")) { hIdx=i; type='det'; break; }
+            }
+
+            if(hIdx === -1) return;
+
+            const headers = rows[hIdx].map(x => x ? x.toString().trim() : "");
+            
+            for(let i=hIdx+1; i<rows.length; i++) {
+                const r = rows[i];
+                if(!r.length) continue;
+                let d={}; headers.forEach((h,x)=>d[h]=r[x]);
+
+                // *** CLEANING LOGIC ***
+                let rawName = d['שם'] || d['מבוטחים'] || d['לקוח'] || d['לקוח '] || r[0];
+                
+                // 1. Skip invalid names
+                if(!rawName || typeof rawName!=='string' || rawName.length<2 || rawName.includes("סה\"כ")) continue;
+                
+                // 2. Skip Numbers (THE FIX)
+                if(!isNaN(parseFloat(rawName)) && isFinite(rawName)) continue; 
+                if(rawName.match(/^\d+$/)) continue; // Regex for pure digits
+
+                // 3. Skip Dates (basic check)
+                if(rawName.match(/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/)) continue;
+
+                // Valid name processing
+                let memberName = rawName.trim();
+
+                // Split multi-names (e.g. "Michal, Hana")
+                let names = memberName.split(/[,&]/).map(n => n.trim());
+                
+                names.forEach(name => {
+                    // Double check split names are also valid
+                    if(!name || !isNaN(parseFloat(name))) return;
+
+                    if(!Families[fKey].members[name]) Families[fKey].members[name] = { ins:[], fin:[], details:{} };
+                    const member = Families[fKey].members[name];
+
+                    if(type==='ins') {
+                        if(!d['ביטוח'] && !d['שם כיסוי']) return;
+                        member.ins.push({
+                            type: d['ביטוח']||d['שם כיסוי'], co: d['חברה']||"", cost: pNum(d['עלות']), cov: pNum(d['סכום פיצוי']), note: d['הערות']||""
+                        });
+                    } else if(type==='fin') {
+                        if(!d['מוצר']) return;
+                        member.fin.push({
+                            prod: d['מוצר'], co: d['חברה']||"", bal: pNum(d['צבירה']), 
+                            fee: d['דמי ניהול']||d['דמי ניהול ']||"", rec: d['המלצות']||""
+                        });
+                    } else if(type==='det') {
+                        member.details = { age: d['גיל'], job: d['עיסוק'], status: d['סטטוס'] };
+                    }
+                });
+            }
+        }
+        function pNum(v){ return parseFloat((v||0).toString().replace(/[^\d.-]/g,''))||0; }
+
+        // --- UI ---
+        function updateHomeStats() {
+            const fams = Object.values(Families);
+            document.getElementById('kpi-families').innerText = fams.length;
+            
+            let totalAum=0, totalPrem=0;
+            fams.forEach(f => {
+                Object.values(f.members).forEach(m => {
+                    totalAum += m.fin.reduce((s,x)=>s+x.bal,0);
+                    totalPrem += m.ins.reduce((s,x)=>s+x.cost,0);
+                });
+            });
+            document.getElementById('kpi-aum').innerText = '₪'+totalAum.toLocaleString();
+            document.getElementById('kpi-prem').innerText = '₪'+totalPrem.toLocaleString();
+        }
+
+        function renderFamilies() {
+            const q = document.getElementById('searchBox').value.toLowerCase();
+            const grid = document.getElementById('families-grid');
+            grid.innerHTML = '';
+
+            Object.keys(Families).filter(k => k.toLowerCase().includes(q)).forEach(fName => {
+                const fam = Families[fName];
+                const members = Object.keys(fam.members);
+                
+                let fPrem=0, fSav=0;
+                members.forEach(m => {
+                    fPrem += fam.members[m].ins.reduce((s,i)=>s+i.cost,0);
+                    fSav += fam.members[m].fin.reduce((s,i)=>s+i.bal,0);
+                });
+
+                const div = document.createElement('div');
+                div.className = 'col-md-4';
+                div.innerHTML = `
+                    <div class="family-card" onclick="loadFamily('${fName}')">
+                        <div class="d-flex justify-content-between mb-3">
+                            <h4 class="fw-bold m-0 text-primary">${fName}</h4>
+                            <i class="fas fa-folder-open text-muted"></i>
+                        </div>
+                        <div class="mb-3">
+                            ${members.map(m => `<span class="badge bg-light text-dark border me-1"><i class="fas fa-user"></i> ${m}</span>`).join('')}
+                        </div>
+                        <div class="row text-center mt-3 pt-3 border-top">
+                            <div class="col">
+                                <div class="stat-label">פרמיה</div>
+                                <div class="fw-bold">₪${fPrem.toLocaleString()}</div>
+                            </div>
+                            <div class="col">
+                                <div class="stat-label">נכסים</div>
+                                <div class="fw-bold text-success">₪${fSav.toLocaleString()}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        function loadFamily(fName) {
+            router('profile');
+            const fam = Families[fName];
+            
+            document.getElementById('f-name').innerText = "תיק משפחת " + fName;
+            document.getElementById('f-members-list').innerText = "מבוטחים: " + Object.keys(fam.members).join(', ');
+
+            // Family Aggregates & Insights
+            let tPrem=0, tSav=0, tRisk=0, tCount=0;
+            let insights = [];
+            
+            const tabsDiv = document.getElementById('members-tabs');
+            const contentDiv = document.getElementById('member-details-container');
+            tabsDiv.innerHTML = '';
+            contentDiv.innerHTML = '';
+
+            const allTab = document.createElement('div');
+            allTab.className = 'member-tab active';
+            allTab.innerText = 'סיכום משפחתי';
+            allTab.onclick = () => filterMember('all', allTab);
+            tabsDiv.appendChild(allTab);
+
+            Object.keys(fam.members).forEach((mKey) => {
+                const m = fam.members[mKey];
+                const prem = m.ins.reduce((s,x)=>s+x.cost,0);
+                const sav = m.fin.reduce((s,x)=>s+x.bal,0);
+                const risk = m.ins.filter(x=>x.type.includes('חיים')||x.type.includes('ריסק')).reduce((s,x)=>s+x.cov,0);
+                
+                tPrem += prem; tSav += sav; tRisk += risk; tCount += (m.ins.length + m.fin.length);
+
+                if(prem > 0 && risk === 0) insights.push(`<b>${mKey}</b>: משלם פרמיות אך ללא כיסוי ריסק (חיים)`);
+                if(m.details.age && m.details.age > 30 && sav < 50000) insights.push(`<b>${mKey}</b>: צבירה פנסיונית נמוכה`);
+
+                const tab = document.createElement('div');
+                tab.className = 'member-tab';
+                tab.innerText = mKey;
+                tab.onclick = () => filterMember(mKey, tab);
+                tabsDiv.appendChild(tab);
+
+                const section = document.createElement('div');
+                section.className = 'member-section fade-in';
+                section.id = 'mem-' + mKey.replace(/\s/g, ''); 
+                section.innerHTML = `
+                    <div class="bg-white p-4 rounded-4 shadow-sm mb-4 border">
+                        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
+                            <h4 class="fw-bold m-0 text-primary">${mKey}</h4>
+                            <span class="badge bg-light text-dark">${m.details.job || ''} ${m.details.age ? '| גיל '+m.details.age : ''}</span>
+                        </div>
+                        
+                        ${m.ins.length ? `
+                        <h6 class="text-primary fw-bold mb-2">תיק ביטוחי (₪${prem.toLocaleString()}/חודש)</h6>
+                        <table class="styled-table mb-4">
+                            <thead><tr><th>סוג</th><th>חברה</th><th>פרמיה</th><th>כיסוי</th><th>הערות</th></tr></thead>
+                            <tbody>${m.ins.map(i=>`<tr><td>${i.type}</td><td>${i.co}</td><td>₪${i.cost}</td><td>${i.cov.toLocaleString()}</td><td class="small text-muted">${i.note}</td></tr>`).join('')}</tbody>
+                        </table>` : ''}
+
+                        ${m.fin.length ? `
+                        <h6 class="text-success fw-bold mb-2">תיק פיננסי (₪${sav.toLocaleString()})</h6>
+                        <table class="styled-table">
+                            <thead><tr><th>מוצר</th><th>חברה</th><th>צבירה</th><th>דמי ניהול</th><th>המלצות</th></tr></thead>
+                            <tbody>${m.fin.map(f=>`<tr><td>${f.prod}</td><td>${f.co}</td><td class="fw-bold">₪${f.bal.toLocaleString()}</td><td>${f.fee}</td><td class="small text-muted">${f.rec}</td></tr>`).join('')}</tbody>
+                        </table>` : ''}
+                    </div>
+                `;
+                contentDiv.appendChild(section);
+            });
+
+            document.getElementById('f-prem').innerText = '₪' + tPrem.toLocaleString();
+            document.getElementById('f-sav').innerText = '₪' + tSav.toLocaleString();
+            document.getElementById('f-risk').innerText = '₪' + tRisk.toLocaleString();
+            document.getElementById('f-count').innerText = tCount;
+
+            const insDiv = document.getElementById('f-insights');
+            insDiv.innerHTML = insights.length ? insights.map(i => `<div class="insight-box"><i class="fas fa-info-circle me-2"></i>${i}</div>`).join('') : '<div class="insight-box text-success"><i class="fas fa-check-circle me-2"></i>התיק נראה תקין ומאוזן</div>';
+
+            const ctx = document.getElementById('famPie').getContext('2d');
+            if(famChart) famChart.destroy();
+            famChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['נכסים', 'ביטוחים'],
+                    datasets: [{
+                        data: [tSav, tPrem*120], 
+                        backgroundColor: ['#10b981', '#4361ee']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function filterMember(mKey, btn) {
+            document.querySelectorAll('.member-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+
+            const sections = document.querySelectorAll('.member-section');
+            if(mKey === 'all') {
+                sections.forEach(s => s.style.display = 'block');
+            } else {
+                sections.forEach(s => s.style.display = 'none');
+                const target = document.getElementById('mem-' + mKey.replace(/\s/g, ''));
+                if(target) target.style.display = 'block';
+            }
+        }
+
+    </script>
+</body>
+</html>

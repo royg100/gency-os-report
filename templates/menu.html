@@ -1,0 +1,22 @@
+<div class="brand">
+    <img src="logo.png" style="height: 50px;" onerror="this.style.display='none'; document.getElementById('txtBrand').style.display='block'">
+    <h4 id="txtBrand" class="m-0 fw-bold mt-2 text-primary" style="display:none">AgencyOS</h4>
+</div>
+
+<div class="nav-list">
+    <div class="nav-item active" onclick="App.router('dashboard')">
+        <i class="fas fa-home"></i> <span>מרכז שליטה</span>
+    </div>
+    <div class="nav-item" onclick="App.triggerUpload()">
+        <i class="fas fa-cloud-upload-alt"></i> <span>טעינת מסלקה</span>
+    </div>
+    <div class="nav-item" onclick="alert('מודול משימות בבנייה')">
+        <i class="fas fa-tasks"></i> <span>משימות</span>
+    </div>
+</div>
+
+<div class="mt-auto">
+    <div class="nav-item text-danger" onclick="location.reload()">
+        <i class="fas fa-sign-out-alt"></i> <span>יציאה</span>
+    </div>
+</div>

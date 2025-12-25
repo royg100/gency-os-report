@@ -1,0 +1,170 @@
+REPORT_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>דוח מסכם - {{ family_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* איפוס ועיצוב בסיסי */
+        body { 
+            font-family: 'Assistant', sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #555; /* רקע אפור למסך */
+            color: #333;
+            /* ביטלנו את display: flex כדי למנוע דפים לבנים */
+        }
+
+        /* הקונטיינר הראשי - מדמה דף A4 על המסך */
+        .page-container { 
+            width: 210mm; 
+            max-width: 100%;
+            min-height: 297mm; 
+            background: white;
+            margin: 30px auto; /* מרכוז אוטומטי בלי Flexbox */
+            padding: 40px;
+            box-sizing: border-box;
+            box-shadow: 0 0 25px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        /* --- הגדרות הדפסה (התיקון הקריטי) --- */
+        @media print {
+            html, body {
+                width: 210mm;
+                height: 100%;
+                margin: 0 !important; 
+                padding: 0 !important;
+                background: white !important;
+                overflow: visible !important;
+                display: block !important; /* מוודא שהדפדפן לא מתבלבל */
+            }
+
+            .page-container {
+                width: 210mm !important;
+                margin: 0 !important;
+                padding: 15mm !important; /* שוליים פנימיים להדפסה */
+                border: none !important;
+                box-shadow: none !important;
+                min-height: auto !important;
+            }
+
+            /* הסתרת אלמנטים מיותרים */
+            .no-print { display: none !important; }
+            
+            /* מניעת חיתוך טבלאות ואלמנטים */
+            tr, .mem-item, .check-card, .kpi-container { page-break-inside: avoid; }
+            .sec-title { page-break-after: avoid; }
+            
+            /* חובה לכרום כדי להדפיס צבעים */
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+        
+        /* עיצוב רכיבים פנימיים */
+        .header { text-align: center; border-bottom: 3px solid #ec4899; padding-bottom: 15px; margin-bottom: 25px; }
+        .header img { height: 70px; margin-bottom: 8px; }
+        .header h1 { margin: 0; font-size: 26pt; color: #2c3e50; font-weight: 800; }
+        .header p { margin: 4px 0; color: #666; font-size: 11pt; }
+
+        .kpi-container { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 30px; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        .kpi-box { flex: 1; text-align: center; border-left: 1px solid #cbd5e1; }
+        .kpi-box:last-child { border-left: none; }
+        .kpi-title { font-size: 10pt; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
+        .kpi-value { font-size: 18pt; font-weight: 800; color: #0f172a; line-height: 1; }
+        .text-pink { color: #ec4899; } .text-green { color: #10b981; } .text-blue { color: #4361ee; }
+
+        .sec-title { background: #2c3e50; color: white; padding: 8px 15px; font-size: 12pt; font-weight: bold; margin-top: 30px; margin-bottom: 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #ec4899; }
+
+        .members-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 25px; }
+        .mem-item { background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 10pt; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .mem-item strong { display: block; color: #ec4899; margin-bottom: 3px; font-size: 11pt; }
+
+        .checklist-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 25px; }
+        .check-card { display: flex; flex-direction: column; align-items: center; justify-content: start; padding: 12px 5px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: center; position: relative; min-height: 75px; }
+        .check-card.found { background: #f0fdf4; border-color: #86efac; color: #166534; }
+        .check-card.missing { background: #fef2f2; border-color: #fca5a5; color: #991b1b; opacity: 0.85; }
+        .check-icon { font-size: 16pt; margin-bottom: 8px; }
+        .check-label { font-size: 9pt; font-weight: 700; margin-bottom: 3px; }
+        .check-status { font-size: 8pt; line-height: 1.1; }
+        
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5pt; table-layout: fixed; }
+        th { background: #f1f5f9; color: #1e293b; padding: 10px 6px; font-weight: bold; border: 1px solid #cbd5e1; text-align: center; }
+        td { padding: 8px 6px; border: 1px solid #e2e8f0; text-align: center; vertical-align: middle; word-wrap: break-word; }
+        tr:nth-child(even) { background: #f8fafc; }
+        
+        .font-bold { font-weight: 700; }
+        .text-start { text-align: right !important; padding-right: 8px !important; }
+        .sum-row { background: #fff1f2 !important; font-weight: bold; border-top: 2px solid #ec4899; }
+        .money { font-family: 'Courier New', Courier, monospace; letter-spacing: -0.5px; font-weight: 600; }
+
+        .footer { text-align: center; font-size: 9pt; color: #94a3b8; border-top: 1px solid #eee; padding-top: 15px; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <div id="loadingMsg" style="text-align:center; color:red; font-weight:bold; margin-bottom:20px;" class="no-print">
+            מכין דוח להדפסה...
+        </div>
+
+        <div class="header">
+            <img src="/logo.png" onerror="this.style.display='none'">
+            <h1>סיכום תיק וניתוח צרכים</h1>
+            <p>הוכן עבור: <strong>{{ family_name }}</strong> | תאריך הפקה: {{ date }}</p>
+        </div>
+
+        <div class="kpi-container">
+            <div class="kpi-box"><div class="kpi-title">פרמיה חודשית</div><div class="kpi-value text-pink">₪{{ total_prem }}</div></div>
+            <div class="kpi-box"><div class="kpi-title">סה"כ נכסים</div><div class="kpi-value text-green">₪{{ total_sav }}</div></div>
+            <div class="kpi-box"><div class="kpi-title">כיסוי ריסק (חיים)</div><div class="kpi-value text-blue">₪{{ total_risk }}</div></div>
+            <div class="kpi-box"><div class="kpi-title">מוצרים בתיק</div><div class="kpi-value">{{ total_count }}</div></div>
+        </div>
+
+        <div class="sec-title"><span>משתתפים</span> <i class="fas fa-users"></i></div>
+        <div class="members-grid">{{ members_html | safe }}</div>
+
+        <div class="sec-title"><span>מפת הגנות משפחתית</span> <i class="fas fa-shield-halved"></i></div>
+        <div class="checklist-grid">{{ checklist_html | safe }}</div>
+
+        <div class="sec-title"><span>תיק ביטוחי</span> <i class="fas fa-shield-alt"></i></div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:12%">מבוטח</th><th style="width:10%">חברה</th><th style="width:15%">סוג כיסוי</th>
+                    <th style="width:10%">פוליסה</th><th style="width:10%">תחילה</th><th style="width:12%">סכום ביטוח</th>
+                    <th style="width:8%">פרמיה</th><th>הערות</th>
+                </tr>
+            </thead>
+            <tbody>{{ ins_rows | safe }}</tbody>
+        </table>
+
+        <div class="sec-title"><span>תיק פיננסי ופנסיוני</span> <i class="fas fa-chart-line"></i></div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:12%">חוסך</th><th style="width:15%">מוצר</th><th style="width:12%">גוף מוסדי</th>
+                    <th style="width:8%">סטטוס</th><th style="width:12%">צבירה</th><th style="width:10%">דמי ניהול</th><th>המלצות ומידע</th>
+                </tr>
+            </thead>
+            <tbody>{{ fin_rows | safe }}</tbody>
+        </table>
+
+        <div class="footer">דוח זה הופק ע"י מערכת AgencyOS | כל הזכויות שמורות לאשר לוי סוכנות לביטוח (2011) בע"מ</div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            // הסתרת הודעת הטעינה
+            document.getElementById('loadingMsg').style.display = 'none';
+            
+            // טיימר להבטחת רינדור מלא
+            setTimeout(function() {
+                window.focus(); // פוקוס חובה לחלק מהדפדפנים
+                window.print();
+            }, 1000); // המתנה של שנייה שלמה
+        };
+    </script>
+</body>
+</html>
+"""
