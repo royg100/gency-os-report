@@ -25,6 +25,7 @@
         .logo { font-size: 3.5rem; color: var(--primary); margin-bottom: 15px; }
         .upload-zone { border: 2px dashed #cbd5e1; border-radius: 16px; padding: 50px 20px; cursor: pointer; transition: all 0.3s ease; background: #fdfdfd; margin: 20px 0; }
         .upload-zone:hover { border-color: var(--primary); background: #fdf2f8; transform: scale(1.01); }
+        .upload-zone.drag-over { border-color: var(--primary); background: #fdf2f8; transform: scale(1.02); box-shadow: 0 0 20px rgba(236, 72, 153, 0.2); }
         .upload-icon { font-size: 3rem; color: #cbd5e1; margin-bottom: 15px; }
         .generate-btn { background: var(--secondary); color: white; border: none; padding: 16px 30px; border-radius: 12px; font-size: 1.2rem; font-weight: 700; cursor: pointer; width: 100%; display: none; }
         .generate-btn:hover { background: #1e293b; transform: translateY(-2px); }
@@ -44,11 +45,282 @@
         .tab-btn { padding: 15px 25px; background: transparent; border: none; border-bottom: 3px solid transparent; font-weight: 600; color: var(--gray); cursor: pointer; white-space: nowrap; }
         .tab-btn:hover { color: var(--primary); background: #f8fafc; }
         .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: #fff0f7; }
+        
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 300px;
+            max-width: 400px;
+            animation: slideInLeft 0.3s ease;
+            border-right: 4px solid;
+        }
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: #ef4444; }
+        .toast.info { border-color: #3b82f6; }
+        .toast.warning { border-color: #f59e0b; }
+        .toast i { font-size: 1.2rem; }
+        .toast.success i { color: var(--success); }
+        .toast.error i { color: #ef4444; }
+        .toast.info i { color: #3b82f6; }
+        .toast.warning i { color: #f59e0b; }
+        .toast-content { flex: 1; }
+        .toast-title { font-weight: 700; margin-bottom: 4px; }
+        .toast-message { font-size: 0.9rem; color: #64748b; }
+        @keyframes slideInLeft {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        /* Progress Bar */
+        .progress-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .progress-overlay.active { display: flex; }
+        .progress-box {
+            background: white;
+            padding: 30px 40px;
+            border-radius: 16px;
+            min-width: 300px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .progress-title {
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--secondary);
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+        .progress-text {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
 
         .content-area { flex: 1; background: #e2e8f0; padding: 20px; overflow: hidden; position: relative; }
         iframe { width: 100%; height: 100%; border: none; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .loader { width: 48px; height: 48px; border: 5px solid #FFF; border-bottom-color: var(--primary); border-radius: 50%; display: none; margin: 20px auto; animation: rotation 1s linear infinite; }
         @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .upload-container { padding: 30px 20px; }
+            .top-bar { flex-direction: column; gap: 10px; padding: 15px; }
+            .top-actions { flex-wrap: wrap; width: 100%; }
+            .top-actions button { flex: 1; min-width: 120px; font-size: 0.85rem; padding: 10px 12px; }
+            .tabs-container { padding: 0 10px; }
+            .tab-btn { padding: 12px 15px; font-size: 0.9rem; }
+            .content-area { padding: 10px; }
+        }
+        
+        /* Accessibility improvements */
+        button:focus-visible, .tab-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+        .upload-zone:focus-within { border-color: var(--primary); }
+        
+        /* Modal styles - עיצוב משופר עם אנימציות */
+        .client-modal { 
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0, 0, 0, 0); 
+            overflow: auto; 
+            transition: background-color 0.3s ease;
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+        }
+        .client-modal.active { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .modal-content { 
+            background: white; 
+            border-radius: 20px; 
+            padding: 0; 
+            max-width: 900px; 
+            width: 90%; 
+            max-height: 90vh; 
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); 
+            position: relative;
+            transform: scale(0.9) translateY(20px);
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+        }
+        .client-modal.active .modal-content {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+        .modal-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin: 0; 
+            padding: 25px 30px; 
+            border-bottom: 2px solid #e2e8f0; 
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+            border-radius: 20px 20px 0 0;
+        }
+        .modal-header h2 { 
+            margin: 0; 
+            color: var(--secondary); 
+            font-size: 1.5rem; 
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .modal-header h2::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+        .close-modal { 
+            background: #f1f5f9; 
+            border: none; 
+            font-size: 1.2rem; 
+            color: var(--gray); 
+            cursor: pointer; 
+            padding: 8px 12px; 
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+        }
+        .close-modal:hover { 
+            background: var(--primary); 
+            color: white;
+            transform: rotate(90deg);
+        }
+        .client-products { 
+            padding: 30px; 
+            overflow-y: auto;
+            max-height: calc(90vh - 100px);
+        }
+        .product-section { 
+            margin-bottom: 35px; 
+        }
+        .product-section:last-child {
+            margin-bottom: 0;
+        }
+        .product-section h3 { 
+            color: var(--secondary); 
+            font-size: 1.3rem; 
+            margin-bottom: 20px; 
+            padding-bottom: 12px; 
+            border-bottom: 2px solid #e2e8f0; 
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .product-item { 
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); 
+            padding: 20px; 
+            border-radius: 12px; 
+            margin-bottom: 15px; 
+            border-right: 4px solid var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        .product-item:hover {
+            transform: translateX(-4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .product-item strong { 
+            color: var(--primary); 
+            display: block; 
+            margin-bottom: 12px; 
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+        .product-details { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+            gap: 12px; 
+            font-size: 0.95rem; 
+            color: #64748b; 
+        }
+        .product-details span { 
+            display: flex; 
+            align-items: center; 
+            gap: 8px;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        .product-details span:hover {
+            background: #f1f5f9;
+            transform: translateY(-2px);
+        }
+        .product-details i {
+            color: var(--primary);
+            width: 18px;
+            text-align: center;
+        }
+        .clickable-client { 
+            cursor: pointer; 
+            color: var(--primary); 
+            text-decoration: none;
+            transition: all 0.2s ease;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+        .clickable-client:hover { 
+            color: var(--primary-dark); 
+            background: #fdf2f8;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -57,15 +329,15 @@
         <div class="upload-container">
             <div class="logo"><i class="fas fa-layer-group"></i></div>
             <h1>מבט 360</h1>
-            <p>גרור את כל קבצי האקסל לכאן</p>
-            <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <p>גרור את כל קבצי האקסל והדאט לכאן</p>
+            <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" role="button" tabindex="0" aria-label="אזור העלאת קבצים - לחץ או גרור קבצים לכאן" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('fileInput').click();}">
                 <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
-                <div class="upload-text">גרור קבצים לכאן</div>
-                <input type="file" id="fileInput" multiple accept=".csv, .xlsx, .xls" style="display:none">
+                <div class="upload-text">גרור קבצים לכאן או לחץ לבחירה</div>
+                <input type="file" id="fileInput" multiple accept=".csv, .xlsx, .xls, .dat" style="display:none" aria-label="בחירת קבצים">
             </div>
             <div id="fileList" style="text-align:right; margin-bottom:20px;"></div>
             <div class="loader" id="loader"></div>
-            <button class="generate-btn" id="generateBtn" onclick="uploadFiles()"><i class="fas fa-magic"></i> צור דשבורד</button>
+            <button class="generate-btn" id="generateBtn" onclick="uploadFiles()" aria-label="צור דשבורד מהקבצים שנבחרו"><i class="fas fa-magic"></i> צור דשבורד</button>
         </div>
     </div>
 
@@ -73,13 +345,44 @@
         <div class="top-bar">
             <div class="app-brand"><i class="fas fa-layer-group"></i> AgencyOS 360</div>
             <div class="top-actions">
-                <button class="btn-pdf" onclick="downloadActiveReport()"><i class="fas fa-file-download"></i> הורד PDF מלא</button>
-                <button class="btn-print" onclick="printActiveReport()"><i class="fas fa-print"></i> הדפסה</button>
-                <button onclick="location.reload()"><i class="fas fa-sync"></i> חדש</button>
+                <button class="btn-add-files" onclick="showAddFilesDialog()" aria-label="הוסף עוד קבצים" style="background: #3b82f6 !important; font-weight: 600;"><i class="fas fa-plus-circle"></i> הוסף קבצים</button>
+                <button class="btn-pdf" onclick="downloadActiveReport()" aria-label="הורד דוח PDF של הדוח הנוכחי"><i class="fas fa-file-download"></i> הורד PDF מלא</button>
+                <button class="btn-excel" onclick="exportToExcel()" aria-label="ייצא ל-Excel" style="background: #10b981 !important; font-weight: 600;"><i class="fas fa-file-excel"></i> ייצוא Excel</button>
+                <button class="btn-print" onclick="printActiveReport()" aria-label="הדפס את הדוח הנוכחי"><i class="fas fa-print"></i> הדפסה</button>
+                <button onclick="location.reload()" aria-label="טען מחדש את הדף"><i class="fas fa-sync"></i> חדש</button>
             </div>
         </div>
         <div class="tabs-container" id="tabsContainer"></div>
         <div class="content-area" id="contentArea"></div>
+    </div>
+
+    <!-- Modal להצגת מוצרי לקוח - עיצוב משופר -->
+    <div class="client-modal" id="clientModal" onclick="if(event.target===this) closeClientModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 id="modalClientName">מוצרי לקוח</h2>
+                <button class="close-modal" onclick="closeClientModal()" aria-label="סגור" title="סגור">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="client-products" id="clientProducts">
+                <!-- התוכן יוטען כאן -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- Progress Overlay -->
+    <div class="progress-overlay" id="progressOverlay">
+        <div class="progress-box">
+            <div class="progress-title" id="progressTitle">מכין PDF...</div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText">0%</div>
+        </div>
     </div>
 
     <script>
@@ -95,53 +398,554 @@
         let reportsData = []; 
         let activeReportIndex = 0;
 
-        fileInput.addEventListener('change', () => {
+        // Validation של קבצים
+        function validateFiles(files) {
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            const allowedTypes = ['.csv', '.xlsx', '.xls', '.dat'];
+            const errors = [];
+            
+            Array.from(files).forEach(file => {
+                const ext = '.' + file.name.split('.').pop().toLowerCase();
+                if (!allowedTypes.includes(ext)) {
+                    errors.push(`קובץ ${file.name} אינו בפורמט נתמך )CSV, XLSX, XLS, DAT(`);
+                }
+                if (file.size > maxSize) {
+                    errors.push(`קובץ ${file.name} גדול מדי )מקסימום 10MB(`);
+                }
+                if (file.size === 0) {
+                    errors.push(`קובץ ${file.name} ריק`);
+                }
+            });
+            
+            if (files.length > 50) {
+                errors.push('יותר מדי קבצים )מקסימום 50(');
+            }
+            
+            return errors;
+        }
+
+        fileInput.addEventListener('change', (e) => {
+            const files = e.target.files;
             fileList.innerHTML = '';
-            if (fileInput.files.length > 0) {
+            
+            if (files.length > 0) {
+                const errors = validateFiles(files);
+                if (errors.length > 0) {
+                    alert('שגיאות:\n' + errors.join('\n'));
+                    fileInput.value = '';
+                    return;
+                }
+                
                 generateBtn.style.display = 'inline-block';
-                Array.from(fileInput.files).forEach(file => fileList.innerHTML += `<div><i class="fas fa-check" style="color:#10b981"></i> ${file.name}</div>`);
+                Array.from(files).forEach(file => {
+                    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                    fileList.innerHTML += `<div style="margin:5px 0; padding:8px; background:#f8fafc; border-radius:6px;">
+                        <i class="fas fa-check" style="color:#10b981; margin-left:8px;"></i> 
+                        <strong>${file.name}</strong> 
+                        <span style="color:#64748b; font-size:0.9em;">(${sizeMB} MB)</span>
+                    </div>`;
+                });
             }
         });
 
-        async function uploadFiles() {
-            if (fileInput.files.length === 0) return;
-            generateBtn.style.display = 'none'; loader.style.display = 'block';
+        // Drag & Drop support
+        const dropZone = document.getElementById('dropZone');
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.style.borderColor = 'var(--primary)';
+                dropZone.style.background = '#fdf2f8';
+                dropZone.style.transform = 'scale(1.02)';
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.style.borderColor = '#cbd5e1';
+                dropZone.style.background = '#fdfdfd';
+                dropZone.style.transform = 'scale(1)';
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        }, false);
+
+        async function uploadFiles(isAdditionalUpload = false) {
+            if (fileInput.files.length === 0) {
+                alert('אנא בחר קבצים להעלאה');
+                return;
+            }
+            
+            if (!isAdditionalUpload) {
+                generateBtn.style.display = 'none'; 
+                loader.style.display = 'block';
+                fileList.innerHTML = '<div style="text-align:center; color:#64748b;">מעלה קבצים...</div>';
+            } else {
+                showProgress('מעלה קבצים נוספים...');
+            }
+            
             const formData = new FormData();
             for (const file of fileInput.files) formData.append('files[]', file);
 
             try {
-                const response = await fetch('/upload', { method: 'POST', body: formData });
+                const response = await fetch('/upload', { 
+                    method: 'POST', 
+                    body: formData,
+                    // הוספת timeout
+                    signal: AbortSignal.timeout(120000) // 2 דקות
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`שגיאת שרת: ${response.status} ${response.statusText}`);
+                }
+                
                 const data = await response.json();
-                if (!data || data.length === 0) { alert('לא נמצאו נתונים.'); location.reload(); return; }
-                reportsData = data; initDashboard(data);
-            } catch (error) { console.error(error); alert('שגיאה'); location.reload(); }
+                
+                if (!data || data.length === 0) { 
+                    if (!isAdditionalUpload) {
+                        loader.style.display = 'none';
+                        generateBtn.style.display = 'inline-block';
+                    } else {
+                        hideProgress();
+                    }
+                    showToast('warning', 'אזהרה', 'לא נמצאו נתונים בעיבוד הקבצים. אנא ודא שהקבצים מכילים נתונים תקינים.');
+                    return; 
+                }
+                
+                if (isAdditionalUpload && reportsData.length > 0) {
+                    // מיזוג הדוחות החדשים עם הקיימים
+                    const existingFamilyKeys = new Set(reportsData.map(r => r.family_name));
+                    for (const newReport of data) {
+                        if (existingFamilyKeys.has(newReport.family_name)) {
+                            // מצא את הדוח הקיים ומיזג
+                            const existingIndex = reportsData.findIndex(r => r.family_name === newReport.family_name);
+                            if (existingIndex !== -1) {
+                                // מיזוג הנתונים
+                                reportsData[existingIndex].raw_ins = [...(reportsData[existingIndex].raw_ins || []), ...(newReport.raw_ins || [])];
+                                reportsData[existingIndex].raw_fin = [...(reportsData[existingIndex].raw_fin || []), ...(newReport.raw_fin || [])];
+                                // עדכון members אם יש
+                                if (newReport.members) {
+                                    Object.assign(reportsData[existingIndex].members || {}, newReport.members);
+                                }
+                            }
+                        } else {
+                            // דוח חדש - הוסף
+                            reportsData.push(newReport);
+                        }
+                    }
+                    hideProgress();
+                    showToast('success', 'הצלחה', `הוספו ${data.length} דוחות בהצלחה`);
+                    initDashboard(reportsData);
+                } else {
+                    reportsData = data; 
+                    if (!isAdditionalUpload) {
+                        initDashboard(data);
+                    } else {
+                        hideProgress();
+                        initDashboard(reportsData);
+                    }
+                }
+            } catch (error) { 
+                console.error('Upload error:', error);
+                if (!isAdditionalUpload) {
+                    loader.style.display = 'none';
+                    generateBtn.style.display = 'inline-block';
+                } else {
+                    hideProgress();
+                }
+                
+                let errorMsg = 'שגיאה בהעלאת הקבצים';
+                if (error.name === 'TimeoutError') {
+                    errorMsg = 'העלאה ארכה יותר מדי זמן. נסה שוב או העלה פחות קבצים.';
+                } else if (error.message) {
+                    errorMsg = error.message;
+                }
+                
+                showToast('error', 'שגיאה', errorMsg);
+            }
+        }
+        
+        function showAddFilesDialog() {
+            // איפוס ה-input כדי לאפשר בחירה מחדש
+            fileInput.value = '';
+            fileInput.click();
+            
+            // הוספת event listener חד-פעמי
+            const handleAddFiles = async (e) => {
+                const files = e.target.files;
+                if (files.length > 0) {
+                    const errors = validateFiles(files);
+                    if (errors.length > 0) {
+                        showToast('error', 'שגיאה', 'שגיאות בקבצים:\n' + errors.join('\n'));
+                        fileInput.value = '';
+                        return;
+                    }
+                    
+                    // הסרת ה-listener
+                    fileInput.removeEventListener('change', handleAddFiles);
+                    
+                    // העלאה
+                    await uploadFiles(true);
+                }
+            };
+            
+            fileInput.addEventListener('change', handleAddFiles, { once: true });
+        }
+
+        // Toast Notification System
+        function showToast(type, title, message, duration = 3000) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                info: 'fa-info-circle',
+                warning: 'fa-exclamation-triangle'
+            };
+            
+            toast.innerHTML = `
+                <i class="fas ${icons[type]}"></i>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideInLeft 0.3s ease reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+        
+        // Progress Bar System
+        function showProgress(title = 'מכין PDF...') {
+            const overlay = document.getElementById('progressOverlay');
+            const progressTitle = document.getElementById('progressTitle');
+            progressTitle.textContent = title;
+            overlay.classList.add('active');
+            updateProgress(0);
+        }
+        
+        function updateProgress(percent) {
+            const bar = document.getElementById('progressBar');
+            const text = document.getElementById('progressText');
+            bar.style.width = percent + '%';
+            text.textContent = Math.round(percent) + '%';
+        }
+        
+        function hideProgress() {
+            const overlay = document.getElementById('progressOverlay');
+            overlay.classList.remove('active');
+            setTimeout(() => updateProgress(0), 300);
         }
 
         function initDashboard(data) {
-            uploadView.style.display = 'none'; dashboardView.style.display = 'flex';
-            tabsContainer.innerHTML = ''; contentArea.innerHTML = '';
+            uploadView.style.display = 'none'; 
+            dashboardView.style.display = 'flex';
+            tabsContainer.innerHTML = ''; 
+            contentArea.innerHTML = '';
+            loader.style.display = 'none';
+            
+            showToast('success', 'הצלחה', `נטענו ${data.length} דוחות בהצלחה`);
 
-            data.forEach((report, index) => {
+            data.forEach((report, reportIndex) => {
+                const tabIndex = reportIndex * 2; // כל דוח מקבל 2 טאבים: דוח + המלצות
+                
+                // טאב 1: דוח כללי
                 const tab = document.createElement('button');
-                tab.className = `tab-btn ${index === 0 ? 'active' : ''}`;
-                tab.innerText = report.family;
-                tab.onclick = () => switchTab(index);
+                tab.className = `tab-btn ${reportIndex === 0 ? 'active' : ''}`;
+                tab.innerText = report.family || `דוח ${reportIndex + 1}`;
+                tab.setAttribute('aria-label', `עבור לדוח ${report.family || reportIndex + 1}`);
+                tab.setAttribute('role', 'tab');
+                tab.setAttribute('aria-selected', reportIndex === 0 ? 'true' : 'false');
+                tab.onclick = () => switchTab(tabIndex);
+                tab.onkeydown = (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        switchTab(tabIndex);
+                    }
+                };
                 tabsContainer.appendChild(tab);
 
+                // טאב 2: המלצות
+                const recTab = document.createElement('button');
+                recTab.className = 'tab-btn';
+                recTab.innerHTML = `<i class="fas fa-lightbulb" style="margin-left:5px;"></i> המלצות`;
+                recTab.setAttribute('aria-label', `המלצות עבור ${report.family || reportIndex + 1}`);
+                recTab.setAttribute('role', 'tab');
+                recTab.setAttribute('aria-selected', 'false');
+                recTab.onclick = () => switchTab(tabIndex + 1);
+                recTab.onkeydown = (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        switchTab(tabIndex + 1);
+                    }
+                };
+                tabsContainer.appendChild(recTab);
+
+                // יצירת iframe לדוח
                 const iframe = document.createElement('iframe');
-                iframe.id = `report-frame-${index}`;
-                iframe.style.display = index === 0 ? 'block' : 'none';
+                iframe.id = `report-frame-${tabIndex}`;
+                iframe.style.display = reportIndex === 0 ? 'block' : 'none';
+                iframe.setAttribute('loading', 'lazy');
+                iframe.setAttribute('title', `דוח ${report.family || reportIndex + 1}`);
                 contentArea.appendChild(iframe);
                 
-                const doc = iframe.contentWindow.document;
-                doc.open(); doc.write(report.html); doc.close();
+                // שמירת ה-HTML לטעינה
+                iframe.dataset.html = report.html;
+                // טעינה מיידית רק לטאב הראשון
+                if (reportIndex === 0) {
+                    loadReportContent(iframe, report.html);
+                    delete iframe.dataset.html;
+                }
+
+                // יצירת div להמלצות
+                const recDiv = document.createElement('div');
+                recDiv.id = `recommendations-${tabIndex + 1}`;
+                recDiv.className = 'recommendations-container';
+                recDiv.style.display = 'none';
+                recDiv.style.padding = '20px';
+                recDiv.style.overflowY = 'auto';
+                recDiv.style.height = '100%';
+                recDiv.style.background = '#f1f5f9';
+                contentArea.appendChild(recDiv);
+                
+                // יצירת תוכן המלצות
+                if (report.recommendations && report.recommendations.length > 0) {
+                    let recHtml = '<div style="max-width:900px; margin:0 auto; background:white; padding:30px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">';
+                    recHtml += '<div style="text-align:center; margin-bottom:30px; padding-bottom:20px; border-bottom:3px solid #0284c7;">';
+                    recHtml += '<i class="fas fa-lightbulb" style="font-size:2.5rem; color:#0284c7; margin-bottom:10px;"></i>';
+                    recHtml += `<h2 style="color:#0c4a6e; margin:0; font-size:1.8rem; font-weight:800;">המלצות מותאמות אישית</h2>`;
+                    recHtml += `<p style="color:#64748b; margin-top:10px; font-size:1.1rem;">${report.family || 'לקוח'}</p>`;
+                    recHtml += '</div>';
+                    
+                    report.recommendations.forEach((rec, idx) => {
+                        recHtml += `<div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; padding:25px; margin-bottom:25px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">`;
+                        recHtml += `<div style="display:flex; align-items:center; gap:12px; margin-bottom:18px; padding-bottom:15px; border-bottom:2px solid #e0f2fe;">`;
+                        recHtml += `<i class="fas fa-user-circle" style="color:#0284c7; font-size:1.5rem;"></i>`;
+                        recHtml += `<strong style="color:#0c4a6e; font-size:1.2rem; font-weight:700;">${rec.client}</strong>`;
+                        recHtml += `</div>`;
+                        recHtml += `<div style="background:white; padding:18px; border-radius:8px; margin-bottom:18px; border:1px solid #e0f2fe;">`;
+                        recHtml += `<div style="font-size:1rem; color:#64748b; margin-bottom:12px; font-weight:600;"><i class="fas fa-exclamation-circle" style="color:#f59e0b; margin-left:8px;"></i> מוצרים שחסרים:</div>`;
+                        recHtml += `<div style="display:flex; flex-wrap:wrap; gap:10px;">`;
+                        rec.missing_items.forEach(item => {
+                            recHtml += `<span style="background:#fef3c7; color:#92400e; padding:8px 14px; border-radius:8px; font-size:0.9rem; font-weight:700; border:1px solid #fcd34d;">${item}</span>`;
+                        });
+                        recHtml += `</div></div>`;
+                        recHtml += `<div style="background:#ecfdf5; border-right:4px solid #10b981; padding:18px; border-radius:8px;">`;
+                        recHtml += `<div style="font-size:1rem; color:#166534; font-weight:700; margin-bottom:12px;"><i class="fas fa-check-circle" style="color:#10b981; margin-left:8px;"></i> המלצות:</div>`;
+                        recHtml += `<ul style="margin:0; padding-right:25px; font-size:0.95rem; color:#166534; line-height:1.8;">`;
+                        rec.recommendations.forEach(recText => {
+                            recHtml += `<li style="margin-bottom:10px; padding-right:5px;">${recText}</li>`;
+                        });
+                        recHtml += `</ul></div></div>`;
+                    });
+                    
+                    recHtml += '</div>';
+                    recDiv.innerHTML = recHtml;
+                } else {
+                    recDiv.innerHTML = '<div style="max-width:800px; margin:50px auto; background:white; padding:50px; border-radius:12px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.1);"><i class="fas fa-check-circle" style="font-size:4rem; color:#10b981; margin-bottom:25px;"></i><h2 style="color:#166534; font-size:1.8rem; margin-bottom:15px;">כל המוצרים הנדרשים קיימים!</h2><p style="color:#64748b; font-size:1.1rem; margin-top:10px;">אין המלצות נוספות בשלב זה.</p></div>';
+                }
             });
             activeReportIndex = 0;
         }
 
+        function loadReportContent(iframe, html) {
+            try {
+                const doc = iframe.contentWindow.document;
+                doc.open(); 
+                doc.write(html); 
+                doc.close();
+                
+                // הוספת event listeners לשמות לקוחות אחרי טעינת התוכן
+                setTimeout(() => {
+                    addClientClickListeners(iframe);
+                }, 500);
+            } catch (error) {
+                console.error('Error loading report:', error);
+                iframe.srcdoc = html;
+                setTimeout(() => {
+                    addClientClickListeners(iframe);
+                }, 500);
+            }
+        }
+
+        function addClientClickListeners(iframe) {
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                
+                // מציאת כל שמות הלקוחות בטבלאות
+                const clientCells = doc.querySelectorAll('td.font-bold, .mem-item strong');
+                
+                clientCells.forEach(cell => {
+                    const clientName = cell.textContent.trim();
+                    if (clientName && clientName.length > 1 && !clientName.includes('סה"כ') && !clientName.includes('₪')) {
+                        cell.classList.add('clickable-client');
+                        cell.style.cursor = 'pointer';
+                        cell.title = 'לחץ לראות מוצרים';
+                        cell.onclick = (e) => {
+                            e.stopPropagation();
+                            showClientProducts(clientName);
+                        };
+                    }
+                });
+            } catch (error) {
+                console.error('Error adding click listeners:', error);
+            }
+        }
+
+        function showClientProducts(clientName) {
+            const modal = document.getElementById('clientModal');
+            const modalName = document.getElementById('modalClientName');
+            const modalProducts = document.getElementById('clientProducts');
+            
+            modalName.innerHTML = `<i class="fas fa-user-circle" style="color:var(--primary);"></i> מוצרים של ${clientName}`;
+            
+            // מציאת הנתונים של הלקוח
+            const currentReport = reportsData[Math.floor(activeReportIndex / 2)];
+            if (!currentReport || !currentReport.raw_data) {
+                modalProducts.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#64748b;"><i class="fas fa-info-circle" style="font-size:3rem; margin-bottom:15px; opacity:0.5;"></i><p style="font-size:1.1rem;">לא נמצאו נתונים עבור לקוח זה</p></div>';
+                modal.classList.add('active');
+                // Scroll to top
+                modalProducts.scrollTop = 0;
+                return;
+            }
+            
+            const rawData = currentReport.raw_data;
+            let html = '';
+            
+            // מוצרי ביטוח
+            const insProducts = rawData.raw_ins.filter(item => item.client === clientName);
+            if (insProducts.length > 0) {
+                html += '<div class="product-section">';
+                html += '<h3><i class="fas fa-shield-alt" style="margin-left:8px;"></i>מוצרי ביטוח</h3>';
+                insProducts.forEach(product => {
+                    html += '<div class="product-item">';
+                    html += `<strong>${product.type || 'לא צוין'}</strong>`;
+                    html += '<div class="product-details">';
+                    if (product.company) html += `<span><i class="fas fa-building"></i> ${product.company}</span>`;
+                    if (product.coverage) html += `<span><i class="fas fa-money-bill-wave"></i> כיסוי: ₪${product.coverage.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</span>`;
+                    if (product.premium) html += `<span><i class="fas fa-credit-card"></i> פרמיה: ₪${product.premium.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</span>`;
+                    if (product.policy) html += `<span><i class="fas fa-file-contract"></i> פוליסה: ${product.policy}</span>`;
+                    if (product.notes) html += `<span><i class="fas fa-comment"></i> ${product.notes}</span>`;
+                    html += '</div></div>';
+                });
+                html += '</div>';
+            }
+            
+            // מוצרים פיננסיים
+            const finProducts = rawData.raw_fin.filter(item => item.client === clientName);
+            if (finProducts.length > 0) {
+                html += '<div class="product-section">';
+                html += '<h3><i class="fas fa-chart-line" style="margin-left:8px;"></i>מוצרים פיננסיים</h3>';
+                finProducts.forEach(product => {
+                    html += '<div class="product-item">';
+                    html += `<strong>${product.product || 'לא צוין'}</strong>`;
+                    html += '<div class="product-details">';
+                    if (product.company) html += `<span><i class="fas fa-building"></i> ${product.company}</span>`;
+                    if (product.balance) html += `<span><i class="fas fa-wallet"></i> יתרה: ₪${product.balance.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</span>`;
+                    if (product.risk) html += `<span><i class="fas fa-chart-pie"></i> סיכון: ${product.risk}</span>`;
+                    if (product.simulation) html += `<span><i class="fas fa-calculator"></i> צפי פרישה: ₪${product.simulation.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</span>`;
+                    if (product.fee) html += `<span><i class="fas fa-percent"></i> דמי ניהול: ${product.fee}</span>`;
+                    if (product.status) html += `<span><i class="fas fa-info-circle"></i> ${product.status}</span>`;
+                    html += '</div></div>';
+                });
+                html += '</div>';
+            }
+            
+            if (html === '') {
+                html = '<div style="text-align:center; padding:60px 20px; color:#64748b;"><i class="fas fa-box-open" style="font-size:3rem; margin-bottom:15px; opacity:0.5;"></i><p style="font-size:1.1rem;">לא נמצאו מוצרים עבור לקוח זה</p></div>';
+            }
+            
+            modalProducts.innerHTML = html;
+            // Scroll to top before showing
+            modalProducts.scrollTop = 0;
+            
+            // פתיחת החלון עם אנימציה
+            modal.classList.add('active');
+            
+            // מניעת scroll של body כשהחלון פתוח
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeClientModal() {
+            const modal = document.getElementById('clientModal');
+            modal.classList.remove('active');
+            // החזרת scroll של body
+            document.body.style.overflow = '';
+        }
+
+        // סגירת החלון עם מקש ESC
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const modal = document.getElementById('clientModal');
+                if (modal.classList.contains('active')) {
+                    closeClientModal();
+                }
+            }
+        });
+
+        // האזנה להודעות מה-iframe
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'showClientProducts') {
+                showClientProducts(event.data.clientName);
+            }
+        });
+
         function switchTab(activeIndex) {
-            document.querySelectorAll('.tab-btn').forEach((t, i) => t.classList.toggle('active', i === activeIndex));
-            document.querySelectorAll('iframe').forEach((f, i) => f.style.display = i === activeIndex ? 'block' : 'none');
+            const totalTabs = reportsData.length * 2; // כל דוח = 2 טאבים
+            if (activeIndex < 0 || activeIndex >= totalTabs) return;
+            
+            // עדכון טאבים
+            document.querySelectorAll('.tab-btn').forEach((t, i) => {
+                const isActive = i === activeIndex;
+                t.classList.toggle('active', isActive);
+                t.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+            
+            // הסתרת כל התוכן
+            document.querySelectorAll('iframe').forEach(f => f.style.display = 'none');
+            document.querySelectorAll('.recommendations-container').forEach(d => d.style.display = 'none');
+            
+            // הצגת התוכן המתאים
+            if (activeIndex % 2 === 0) {
+                // טאב דוח רגיל
+                const reportIndex = activeIndex / 2;
+                const iframe = document.getElementById(`report-frame-${activeIndex}`);
+                if (iframe && reportsData[reportIndex]) {
+                    iframe.style.display = 'block';
+                    // תמיד נטען את התוכן מהנתונים
+                    if (reportsData[reportIndex].html) {
+                        loadReportContent(iframe, reportsData[reportIndex].html);
+                    }
+                }
+            } else {
+                // טאב המלצות
+                const recDiv = document.getElementById(`recommendations-${activeIndex}`);
+                if (recDiv) {
+                    recDiv.style.display = 'block';
+                }
+            }
+            
             activeReportIndex = activeIndex;
         }
 
@@ -150,9 +954,77 @@
             if (activeFrame) activeFrame.contentWindow.print();
         }
 
+        // ייצוא ל-Excel
+        function exportToExcel() {
+            const currentReport = reportsData[Math.floor(activeReportIndex / 2)];
+            if (!currentReport) {
+                showToast('error', 'שגיאה', 'לא נמצא דוח לייצוא');
+                return;
+            }
+            
+            showProgress('מייצא ל-Excel...');
+            updateProgress(30);
+            
+            try {
+                // יצירת נתונים ל-Excel
+                const data = currentReport.raw_data;
+                let csvContent = '';
+                
+                // כותרת
+                csvContent += 'דוח: ' + (currentReport.family || 'כללי') + '\n';
+                csvContent += 'תאריך: ' + new Date().toLocaleDateString('he-IL') + '\n\n';
+                
+                // מוצרי ביטוח
+                if (data.raw_ins && data.raw_ins.length > 0) {
+                    csvContent += 'מוצרי ביטוח\n';
+                    csvContent += 'מבוטח,חברה,סוג כיסוי,פוליסה,תחילה,סכום ביטוח,פרמיה,הערות\n';
+                    data.raw_ins.forEach(item => {
+                        csvContent += `"${item.client || ''}","${item.company || ''}","${item.type || ''}","${item.policy || ''}","${item.start_date || ''}",${item.coverage || 0},${item.premium || 0},"${item.notes || ''}"\n`;
+                    });
+                    csvContent += '\n';
+                }
+                
+                updateProgress(60);
+                
+                // מוצרים פיננסיים
+                if (data.raw_fin && data.raw_fin.length > 0) {
+                    csvContent += 'מוצרים פיננסיים\n';
+                    csvContent += 'חוסך,מוצר,גוף מוסדי,רמת סיכון,צבירה,צפי פרישה,דמי ניהול,סטטוס\n';
+                    data.raw_fin.forEach(item => {
+                        csvContent += `"${item.client || ''}","${item.product || ''}","${item.company || ''}","${item.risk || ''}",${item.balance || 0},${item.simulation || 0},"${item.fee || ''}","${item.status || ''}"\n`;
+                    });
+                }
+                
+                updateProgress(90);
+                
+                // הורדת הקובץ
+                const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `דוח_${currentReport.family || 'כללי'}_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                updateProgress(100);
+                setTimeout(() => {
+                    hideProgress();
+                    showToast('success', 'הצלחה', 'הקובץ יוצא בהצלחה');
+                }, 500);
+            } catch (error) {
+                hideProgress();
+                showToast('error', 'שגיאה', 'שגיאה בייצוא הקובץ: ' + error.message);
+            }
+        }
+
         function downloadActiveReport() {
     const activeFrame = document.getElementById(`report-frame-${activeReportIndex}`);
-    if (!activeFrame) return;
+    if (!activeFrame) {
+        showToast('error', 'שגיאה', 'לא נמצא דוח לייצוא');
+        return;
+    }
 
     // שליפת שם המשפחה לשם הקובץ
     const reports = typeof reportsData !== 'undefined' ? reportsData : [];
@@ -161,7 +1033,9 @@
     const btn = document.querySelector('.btn-pdf');
     const originalText = btn.innerHTML;
     
-    // חיווי למשתמש
+    // חיווי למשתמש עם progress bar
+    showProgress('מכין PDF...');
+    updateProgress(10);
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מכין קובץ...';
     btn.disabled = true;
 
@@ -173,14 +1047,26 @@
     // 2. טיפול בקנבסים (גרפים) - המרה לתמונות כדי שיופיעו ב-PDF
     const originalCanvases = originalBody.querySelectorAll('canvas');
     const clonedCanvases = clonedBody.querySelectorAll('canvas');
-    originalCanvases.forEach((orig, i) => {
-        if (clonedCanvases[i]) {
-            const img = document.createElement('img');
-            img.src = orig.toDataURL();
-            img.style.width = '100%';
-            clonedCanvases[i].parentNode.replaceChild(img, clonedCanvases[i]);
-        }
-    });
+    
+    // המתין שהגרפים יסיימו את האנימציה לפני המרה
+    const convertCanvasesToImages = () => {
+        originalCanvases.forEach((orig, i) => {
+            if (clonedCanvases[i] && orig.width > 0 && orig.height > 0) {
+                try {
+                    const img = document.createElement('img');
+                    img.src = orig.toDataURL('image/png', 1.0);
+                    img.style.width = '100%';
+                    img.style.maxWidth = '400px';
+                    img.style.height = 'auto';
+                    img.style.display = 'block';
+                    img.style.margin = '0 auto';
+                    clonedCanvases[i].parentNode.replaceChild(img, clonedCanvases[i]);
+                } catch (e) {
+                    console.warn('Error converting canvas to image:', e);
+                }
+            }
+        });
+    };
 
     // 3. יצירת קונטיינר זמני נסתר ליצירת ה-PDF
     const container = document.createElement('div');
@@ -195,8 +1081,24 @@
     // --- התיקון הקריטי: CSS שדורס את הגדרות המסך ---
     const styleFix = document.createElement('style');
     styleFix.innerHTML = `
-        /* איפוס כללי כדי למנוע שוליים לבנים מיותרים */
-        body, html { margin: 0 !important; padding: 0 !important; background: #fff !important; width: 100% !important; height: auto !important; }
+        /* תיקון קריטי לטקסט עברי - מניעת מילים מחוברות */
+        * {
+            word-spacing: 0.1em !important;
+            letter-spacing: 0.01em !important;
+            white-space: normal !important;
+            text-rendering: optimizeLegibility !important;
+        }
+        
+        body, html { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            background: #fff !important; 
+            width: 100% !important; 
+            height: auto !important; 
+            direction: rtl !important;
+            text-align: right !important;
+            unicode-bidi: embed !important;
+        }
         
         /* ביטול הגבלות הגודל של הקונטיינר המקורי */
         .page-container { 
@@ -209,6 +1111,7 @@
             min-height: auto !important; /* קריטי: נותן לתוכן לקבוע את האורך */
             height: auto !important;
             overflow: visible !important;
+            direction: rtl !important;
         }
 
         /* הגדרת רוחב אופטימלי ל-PDF כדי למנוע חיתוך צדדי */
@@ -221,15 +1124,64 @@
         /* הסתרת אלמנטים לא רצויים */
         .no-print, #loadingMsg { display: none !important; }
         
+        /* אופטימיזציה של רווחים ב-PDF */
+        .header { margin-bottom: 12px !important; padding-bottom: 8px !important; }
+        .kpi-container { margin-bottom: 12px !important; padding: 12px !important; }
+        .sec-title { margin-top: 10px !important; margin-bottom: 8px !important; padding: 5px 10px !important; }
+        .members-grid { margin-bottom: 12px !important; gap: 8px !important; }
+        .checklist-grid { margin-bottom: 12px !important; gap: 8px !important; }
+        .charts-section { margin-top: 8px !important; margin-bottom: 12px !important; gap: 10px !important; }
+        table { margin-bottom: 12px !important; }
+        .recommendations-box { margin-top: 12px !important; padding: 12px !important; }
+        .footer { margin-top: 15px !important; padding-top: 8px !important; }
+        
+        /* כותרות עמוד - רווח קטן יותר */
+        .sec-title:first-child { margin-top: 5px !important; }
+        div[style*="page-break-after: always"] .sec-title:first-child { margin-top: 5px !important; }
+        
+        /* שיפור תצוגת גרפים ב-PDF */
+        .chart-wrapper {
+            page-break-inside: avoid !important;
+            margin-bottom: 12px !important;
+        }
+        .chart-wrapper canvas, .chart-wrapper img {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+        
         /* שיפור תצוגת טבלאות למניעת שבירה */
-        table { page-break-inside: auto; width: 100% !important; layout: fixed; }
-        tr { page-break-inside: avoid; page-break-after: auto; }
+        table { 
+            page-break-inside: auto; 
+            width: 100% !important; 
+            layout: fixed; 
+            direction: rtl !important;
+        }
+        th, td { 
+            word-spacing: 0.1em !important; 
+            white-space: normal !important; 
+            word-wrap: break-word !important;
+        }
+        tr { page-break-inside: avoid !important; page-break-after: auto; }
         thead { display: table-header-group; }
         tfoot { display: table-footer-group; }
         
         /* מניעת חיתוך של כרטיסים ואלמנטים חשובים */
-        .kpi-container, .check-card, .mem-item, .sec-title {
-            page-break-inside: avoid;
+        .kpi-container, .check-card, .mem-item, .sec-title, .charts-section, .members-grid, .checklist-grid {
+            page-break-inside: avoid !important;
+            word-spacing: 0.1em !important;
+            white-space: normal !important;
+        }
+        
+        /* תיקון נוסף לכל האלמנטים עם טקסט */
+        h1, h2, h3, h4, h5, h6, p, div, span, strong, em, li, td, th, .header, .footer, .rec-item, .kpi-title, .kpi-value, .check-label, .check-status, .mem-item strong {
+            word-spacing: 0.1em !important;
+            white-space: normal !important;
+            direction: rtl !important;
+        }
+        
+        /* מניעת שבירה מיותרת - רצף טבעי */
+        div[style*="page-break-inside: avoid"] {
+            page-break-inside: avoid !important;
         }
     `;
     container.appendChild(styleFix);
@@ -240,42 +1192,101 @@
     container.style.top = '0';
     document.body.appendChild(container);
 
-    // 4. הגדרות הספרייה html2pdf
+    // 4. הגדרות הספרייה html2pdf - אופטימליות ל-PDF
     const opt = {
-        margin:       [10, 10, 10, 10], // שוליים: למעלה, ימין, למטה, שמאל (במ"מ)
+        margin:       [8, 8, 8, 8], // שוליים קטנים יותר
         filename:     `סיכום_תיק_${familyName}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { 
-            scale: 2, // איכות גבוהה (מונע טקסט מטושטש)
+            scale: 2, // איכות גבוהה
             useCORS: true, 
             logging: false,
-            letterRendering: true, 
-            scrollY: 0
+            letterRendering: true,
+            allowTaint: true,
+            scrollY: 0,
+            windowWidth: 1200,
+            windowHeight: 1600,
+            onclone: function(clonedDoc) {
+                // תיקון קריטי לטקסט עברי על העותק המשוכפל
+                const clonedBody = clonedDoc.body;
+                clonedBody.style.direction = 'rtl';
+                clonedBody.style.textAlign = 'right';
+                clonedBody.style.wordSpacing = '0.1em';
+                clonedBody.style.letterSpacing = '0.01em';
+                clonedBody.style.whiteSpace = 'normal';
+                clonedBody.style.textRendering = 'optimizeLegibility';
+                clonedBody.style.unicodeBidi = 'embed';
+                
+                // תיקון לכל האלמנטים עם טקסט
+                const allElements = clonedDoc.querySelectorAll('*');
+                allElements.forEach(el => {
+                    if (el.style) {
+                        el.style.wordSpacing = '0.1em';
+                        el.style.whiteSpace = 'normal';
+                        el.style.letterSpacing = '0.01em';
+                        if (!el.style.direction || el.style.direction === 'ltr') {
+                            el.style.direction = 'rtl';
+                        }
+                    }
+                });
+            }
         },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        // --- הגדרה קריטית למניעת חיתוך אלמנטים באמצע ---
+        jsPDF:        { 
+            unit: 'mm', 
+            format: 'a4', 
+            orientation: 'portrait',
+            compress: true
+        },
+        // הגדרות אופטימליות למניעת שבירה באמצע
         pagebreak:    { 
-            mode: ['css', 'legacy'], 
-            // רשימת אלמנטים שאסור לחתוך באמצע
-            avoid: ['tr', '.kpi-container', '.sec-title', '.check-card', '.mem-item', '.header'] 
+            mode: ['avoid-all', 'css', 'legacy'], 
+            avoid: [
+                'tr', 
+                '.kpi-container', 
+                '.sec-title', 
+                '.check-card', 
+                '.mem-item', 
+                '.header', 
+                '.charts-section', 
+                '.members-grid', 
+                '.checklist-grid',
+                'table',
+                '.recommendations-box'
+            ]
         }
     };
 
-    // ביצוע ההמרה
+    // ביצוע ההמרה - המתין שהגרפים יסיימו את האנימציה ואז המרה לתמונות
+    updateProgress(20);
     setTimeout(() => {
-        html2pdf().set(opt).from(contentWrapper).save().then(() => {
-            // ניקוי לאחר סיום
-            document.body.removeChild(container);
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }).catch(err => {
-            console.error(err);
-            alert("שגיאה ביצירת PDF");
-            if (document.body.contains(container)) document.body.removeChild(container);
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        });
-    }, 500); // השהייה קטנה לוודא שהכל נטען
+        updateProgress(40);
+        // המרת קנבסים לתמונות
+        convertCanvasesToImages();
+        updateProgress(60);
+        
+        // המתין קצת שהתמונות יטענו ואז יצירת ה-PDF
+        setTimeout(() => {
+            updateProgress(80);
+            html2pdf().set(opt).from(contentWrapper).save().then(() => {
+                updateProgress(100);
+                // ניקוי לאחר סיום
+                document.body.removeChild(container);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                setTimeout(() => {
+                    hideProgress();
+                    showToast('success', 'הצלחה', 'ה-PDF נוצר בהצלחה');
+                }, 500);
+            }).catch(err => {
+                console.error(err);
+                hideProgress();
+                showToast('error', 'שגיאה', 'שגיאה ביצירת PDF: ' + err.message);
+                if (document.body.contains(container)) document.body.removeChild(container);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }, 500); // השהייה קצרה לטעינת התמונות
+    }, 2500); // השהייה כדי שהגרפים יסיימו את האנימציה (2 שניות + 0.5 שניות)
 }
     </script>
 </body>
