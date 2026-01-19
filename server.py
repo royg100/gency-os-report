@@ -1344,13 +1344,31 @@ def upload_files():
     for file_idx, file in enumerate(files, 1):
         try:
             filename = file.filename
-            print(f"\n[{file_idx}/{len(files)}] מעבד קובץ: {filename}")
+            print(f"\n{'='*80}")
+            print(f"[{file_idx}/{len(files)}] מעבד קובץ: {filename}")
+            print(f"{'='*80}")
             
-            clean_name = re.sub(r'\.(xlsx|xls|csv|dat)$', '', filename, flags=re.IGNORECASE)
-            family_key = re.sub(r'(ניתוח תיק|ניהול סיכונים|פרטים אישיים|ביטוחים|פנסיה|\d+|עותק).*', '', clean_name).strip("- ").strip()
-            if not family_key: family_key = "כללי"
+            # זיהוי סוג הקובץ
+            filename_lower = filename.lower()
+            is_dat = filename_lower.endswith('.dat')
+            is_csv = filename_lower.endswith('.csv')
+            is_xlsx = filename_lower.endswith('.xlsx') or filename_lower.endswith('.xls')
+            print(f"  [זיהוי קובץ] שם: {filename}, DAT: {is_dat}, CSV: {is_csv}, Excel: {is_xlsx}")
             
-            print(f"  → שם משפחה מזוהה: '{family_key}'")
+            # וידוא שהקובץ לא ריק
+            file.stream.seek(0, 2)  # מעבר לסוף הקובץ
+            file_size = file.stream.tell()
+            file.stream.seek(0)  # חזרה לתחילת הקובץ
+            print(f"  [גודל קובץ] {file_size} bytes")
+            
+            if file_size == 0:
+                print(f"  [⚠] קובץ ריק - מדלג")
+                continue
+            
+            # כל הקבצים יעובדו יחד בדוח אחד
+            family_key = "כללי"
+            
+            print(f"  → כל הקבצים יעובדו יחד תחת: '{family_key}'")
 
             if family_key not in grouped_reports:
                 grouped_reports[family_key] = { "family_name": family_key, "members": {}, "raw_ins": [], "raw_fin": [] }
@@ -1364,7 +1382,8 @@ def upload_files():
             dfs = []
             
             # בדיקה אם קובץ DAT מכיל XML (פורמט מסלקה)
-            if filename.lower().endswith('.dat'):
+            if is_dat:
+                print(f"  [DAT] זה קובץ DAT - מתחיל עיבוד...")
                 file.stream.seek(0)
                 file_bytes = file.read()
                 file.stream.seek(0)
@@ -1416,9 +1435,10 @@ def upload_files():
                         else:
                             print(f"⚠ לא נמצאו נתונים ביטוחיים בקובץ {filename}")
                         
+                        print(f"  [DAT] ✓ סיום עיבוד קובץ DAT - ממשיך לקובץ הבא")
                         continue  # דילוג על עיבוד DataFrame
                     else:
-                        print(f"✗ קובץ {filename} לא זוהה כ-XML")
+                        print(f"  [DAT] ✗ קובץ {filename} לא זוהה כ-XML")
                 except UnicodeDecodeError:
                     # נסה עם encoding אחר
                     try:
@@ -1483,27 +1503,54 @@ def upload_files():
                         except:
                             file.stream.seek(0)
                             dfs.append(pd.read_csv(file, encoding='latin-1', sep=None, engine='python'))
-            elif filename.endswith('.csv'):
+            elif is_csv:
                 # טיפול בקבצי CSV - נסה מספר encodings ומופרדים
+                print(f"  [CSV] זה קובץ CSV - מתחיל עיבוד...")
                 try: 
                     dfs.append(pd.read_csv(file, encoding='utf-8', sep=None, engine='python'))
-                except: 
+                    print(f"  [CSV] ✓ קובץ CSV נקרא בהצלחה (UTF-8)")
+                except Exception as e: 
+                    print(f"  [CSV] ✗ שגיאה ב-UTF-8: {e}, מנסה cp1255...")
                     try:
                         file.stream.seek(0)
                         dfs.append(pd.read_csv(file, encoding='cp1255', sep=None, engine='python'))
-                    except:
+                        print(f"  [CSV] ✓ קובץ CSV נקרא בהצלחה (cp1255)")
+                    except Exception as e2:
+                        print(f"  [CSV] ✗ שגיאה ב-cp1255: {e2}, מנסה latin-1...")
                         file.stream.seek(0)
                         dfs.append(pd.read_csv(file, encoding='latin-1', sep=None, engine='python'))
-            else:
+                        print(f"  [CSV] ✓ קובץ CSV נקרא בהצלחה (latin-1)")
+            elif is_xlsx:
                 # קבצי אקסל
-                print(f"  → קורא קובץ אקסל: {filename}")
-                xls_dict = pd.read_excel(file, sheet_name=None)
-                dfs = list(xls_dict.values())
-                print(f"  → נמצאו {len(dfs)} גיליונות בקובץ אקסל")
+                print(f"  [Excel] זה קובץ אקסל - מתחיל עיבוד...")
+                print(f"  [Excel] → קורא קובץ אקסל: {filename}")
+                try:
+                    file.stream.seek(0)  # וידוא שהקובץ בתחילתו
+                    xls_dict = pd.read_excel(file, sheet_name=None)
+                    dfs = list(xls_dict.values())
+                    print(f"  [Excel] ✓ נמצאו {len(dfs)} גיליונות בקובץ אקסל")
+                    for sheet_idx, df in enumerate(dfs):
+                        print(f"    → גיליון {sheet_idx+1}: {len(df)} שורות, {len(df.columns)} עמודות")
+                except Exception as e:
+                    print(f"  [Excel] ✗ שגיאה בקריאת קובץ אקסל {filename}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
+            else:
+                print(f"  [⚠] קובץ לא מזוהה: {filename} - מדלג")
+                continue
 
-            for df_raw in dfs:
+            if len(dfs) == 0:
+                print(f"  [⚠] אין DataFrames לעיבוד - מדלג על קובץ {filename}")
+                continue
+                
+            print(f"  → סה\"כ {len(dfs)} DataFrame(s) לעיבוד")
+            for df_idx, df_raw in enumerate(dfs, 1):
+                print(f"\n  [DataFrame {df_idx}/{len(dfs)}] מתחיל עיבוד DataFrame...")
+                print(f"    → DataFrame: {len(df_raw)} שורות, {len(df_raw.columns)} עמודות")
+                
                 # טיפול מיוחד בקבצי CSV עם שני חלקים (ביטוח ופיננסי)
-                if filename.lower().endswith('.csv'):
+                if is_csv:
                     print(f"  → מעבד קובץ CSV: {filename}")
                     # חיפוש כל הכותרות בקובץ
                     sections = []
@@ -1623,13 +1670,14 @@ def upload_files():
                         continue
                 
                 # לוגיקה רגילה לקבצים אחרים (אקסל וכו')
-                print(f"  → מחפש כותרת בקובץ {filename}...")
+                file_type_str = 'CSV' if is_csv else 'Excel' if is_xlsx else 'Unknown'
+                print(f"  [לוגיקה רגילה] מחפש כותרת בקובץ {filename} (סוג קובץ: {file_type_str})...")
                 header_idx, ftype = find_header_and_type(df_raw)
                 if header_idx == -1:
-                    print(f"  ✗ לא נמצאה כותרת בקובץ {filename}")
+                    print(f"  [לוגיקה רגילה] ✗ לא נמצאה כותרת בקובץ {filename}")
                     continue
                 
-                print(f"  ✓ נמצאה כותרת בשורה {header_idx}, סוג: {ftype}")
+                print(f"  [לוגיקה רגילה] ✓ נמצאה כותרת בשורה {header_idx}, סוג: {ftype} (קובץ: {filename})")
 
                 df = df_raw.iloc[header_idx+1:].reset_index(drop=True)
                 raw_cols = df_raw.iloc[header_idx].values
@@ -1663,13 +1711,16 @@ def upload_files():
 
                 elif ftype == 'ins':
                      # לוגיקה קיימת... (ללא שינוי מהותי) - לקבצי אקסל
-                    print(f"  → מעבד חלק ביטוח (ins) מקובץ {filename}")
+                    print(f"  [ביטוח] ====== מתחיל עיבוד ביטוח (ins) מקובץ {filename} (אקסל -> ביטוח) ======")
                     col_client = next((c for c in df.columns if 'מבוטח' in c), 'מבוטחים')
-                    print(f"  → עמודת לקוח: '{col_client}'")
-                    print(f"  → מספר שורות: {len(df)}")
+                    print(f"  [ביטוח] → עמודת לקוח: '{col_client}'")
+                    print(f"  [ביטוח] → מספר שורות: {len(df)}")
+                    print(f"  [ביטוח] → עמודות: {list(df.columns)}")
                     last_valid_client = None
                     ins_count = 0
-                    for _, row in df.iterrows():
+                    for row_idx, (_, row) in enumerate(df.iterrows(), 1):
+                        if row_idx <= 3:  # הדפס את 3 הראשונות
+                            print(f"  [ביטוח] → שורה {row_idx}: {dict(row)}")
                         raw_name = clean_text(row.get(col_client))
                         if is_valid_name(raw_name): last_valid_client = raw_name
                         elif last_valid_client and (clean_currency(row.get('עלות')) > 0 or clean_currency(row.get('סכום פיצוי')) > 0): pass
@@ -1691,11 +1742,48 @@ def upload_files():
                                     "type": prod, "coverage": cov, "premium": prem, "notes": clean_text(row.get('הערות'))
                                 })
                                 ins_count += 1
-                    print(f"  ✓ נוספו {ins_count} רשומות ביטוח מקובץ {filename}")
+                                if ins_count <= 3:  # הדפס את 3 הראשונות
+                                    print(f"  [ביטוח] ✓ נוספה רשומה #{ins_count}: {sub_client} - {prod} (כיסוי: {cov}, פרמיה: {prem})")
+                    print(f"  [ביטוח] ====== סיום עיבוד ביטוח: נוספו {ins_count} רשומות ביטוח מקובץ {filename} ======")
 
                 elif ftype == 'fin':
-                    # קבצי אקסל עם ftype='fin' - לא נטפל בהם, רק DAT נטפל בפיננסי
-                    print(f"⚠ קובץ אקסל מזוהה כ-'fin' (פיננסי) - דילוג. רק קבצי DAT יעובדו לפיננסי.")
+                    # קבצי אקסל עם ftype='fin' - נטפל בהם כביטוח (אקסל -> רק ביטוח)
+                    print(f"⚠ קובץ אקסל מזוהה כ-'fin' (פיננסי) - נטפל כביטוח. רק קבצי DAT יעובדו לפיננסי.")
+                    # נטפל בקובץ האקסל כביטוח במקום לדלג עליו
+                    col_client = next((c for c in df.columns if 'מבוטח' in c or 'חוסך' in c or 'לקוח' in c), None)
+                    if col_client:
+                        print(f"  → מעבד קובץ אקסל כביטוח, עמודת לקוח: '{col_client}'")
+                        ins_count = 0
+                        for _, row in df.iterrows():
+                            client_name = clean_text(row.get(col_client))
+                            if not is_valid_name(client_name):
+                                continue
+                            
+                            prod = clean_text(row.get('ביטוח') or row.get('סוג כיסוי') or row.get('מוצר'))
+                            if not prod:
+                                continue
+                            
+                            prem = clean_currency(row.get('עלות') or row.get('פרמיה'))
+                            cov = clean_currency(row.get('סכום פיצוי') or row.get('סכום ביטוח') or row.get('כיסוי'))
+                            
+                            if prem == 0 and cov == 0 and not clean_text(row.get('הערות')):
+                                continue
+                            
+                            for sub_client in re.split(r'[,&+]', client_name):
+                                sub_client = sub_client.strip()
+                                if is_valid_name(sub_client):
+                                    current_report["raw_ins"].append({
+                                        "client": sub_client,
+                                        "company": clean_text(row.get('חברה') or row.get('גוף מוסדי')),
+                                        "policy": clean_text(row.get('מ.פוליסה') or row.get('פוליסה')),
+                                        "start_date": clean_text(row.get('תחילת ביטוח') or row.get('תחילה')),
+                                        "type": prod,
+                                        "coverage": cov,
+                                        "premium": prem,
+                                        "notes": clean_text(row.get('הערות'))
+                                    })
+                                    ins_count += 1
+                        print(f"  ✓ נוספו {ins_count} רשומות ביטוח מקובץ אקסל (שזוהה כ-'fin')")
                     continue
             
             # סיכום עיבוד הקובץ
@@ -1703,9 +1791,11 @@ def upload_files():
             raw_fin_after = len(current_report["raw_fin"])
             ins_added = raw_ins_after - raw_ins_before
             fin_added = raw_fin_after - raw_fin_before
+            print(f"\n{'='*80}")
             print(f"  ✓ סיום עיבוד קובץ {filename}:")
-            print(f"    - נוספו {ins_added} רשומות ביטוח (סה\"כ: {raw_ins_after})")
-            print(f"    - נוספו {fin_added} רשומות פיננסיות (סה\"כ: {raw_fin_after})")
+            print(f"    - נוספו {ins_added} רשומות ביטוח (לפני: {raw_ins_before}, אחרי: {raw_ins_after})")
+            print(f"    - נוספו {fin_added} רשומות פיננסיות (לפני: {raw_fin_before}, אחרי: {raw_fin_after})")
+            print(f"{'='*80}\n")
 
         except Exception as e:
             print(f"✗ שגיאה בעיבוד קובץ {file.filename}: {e}")
@@ -1723,23 +1813,39 @@ def upload_files():
         print(f"    - משתתפים: {len(data.get('members', {}))} אנשים")
     print(f"{'='*60}\n")
 
-    results = []
+    # איחוד כל הדוחות לדוח אחד
+    print(f"\n=== איחוד כל הדוחות לדוח אחד ===")
+    merged_data = {
+        "family_name": "כללי",
+        "members": {},
+        "raw_ins": [],
+        "raw_fin": []
+    }
+    
+    # איחוד כל הנתונים
     for fam_name, data in grouped_reports.items():
-        print(f"\n=== יצירת דוח עבור {fam_name} ===")
-        print(f"✓ יש {len(data.get('raw_fin', []))} רשומות ב-raw_fin לפני יצירת הדוח")
-        if data.get('raw_fin'):
-            print(f"✓ דוגמה לרשומה ראשונה: {data['raw_fin'][0]}")
-        html_content = generate_single_html_report(data)
-        results.append({ 
-            "family": fam_name, 
-            "html": html_content,
-            "recommendations": [],
-            "raw_data": {
-                "raw_ins": data.get("raw_ins", []),
-                "raw_fin": data.get("raw_fin", []),
-                "members": data.get("members", {})
-            }
-        })
+        print(f"  → מאחד דוח '{fam_name}': {len(data.get('raw_ins', []))} ביטוחים, {len(data.get('raw_fin', []))} פיננסיים")
+        # איחוד ביטוחים
+        merged_data["raw_ins"].extend(data.get("raw_ins", []))
+        # איחוד פיננסיים
+        merged_data["raw_fin"].extend(data.get("raw_fin", []))
+        # איחוד משתתפים
+        merged_data["members"].update(data.get("members", {}))
+    
+    print(f"\n=== יצירת דוח מאוחד ===")
+    print(f"✓ סה\"כ: {len(merged_data.get('raw_ins', []))} ביטוחים, {len(merged_data.get('raw_fin', []))} פיננסיים, {len(merged_data.get('members', {}))} משתתפים")
+    
+    html_content = generate_single_html_report(merged_data)
+    results = [{ 
+        "family": "כללי", 
+        "html": html_content,
+        "recommendations": [],
+        "raw_data": {
+            "raw_ins": merged_data.get("raw_ins", []),
+            "raw_fin": merged_data.get("raw_fin", []),
+            "members": merged_data.get("members", {})
+        }
+    }]
 
     return jsonify(results)
 
