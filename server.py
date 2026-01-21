@@ -1,16 +1,97 @@
 import os
-from flask import Flask, request, jsonify, send_from_directory
+import html
+import secrets
+import bcrypt
+from functools import wraps
+from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
 from flask_cors import CORS
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import pandas as pd
 import re
 from datetime import datetime
 import json
 import xml.etree.ElementTree as ET
 from io import BytesIO
+from werkzeug.utils import secure_filename
+from pathlib import Path
 
 # הגדרת האפליקציה
 app = Flask(__name__, static_folder='.')
-CORS(app)
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+
+# הגבלת CORS - רק למקורות מותרים
+CORS(app, resources={
+    r"/*": {
+        "origins": os.environ.get('ALLOWED_ORIGINS', 'http://localhost:5000').split(','),
+        "methods": ["GET", "POST"],
+        "allow_headers": ["Content-Type"]
+    }
+})
+
+# Rate Limiting
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+# Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# משתמשים (בסביבת ייצור יש לשמור במסד נתונים)
+# סיסמה: admin123 (hash עם bcrypt)
+USERS = {
+    'admin': {
+        'password_hash': bcrypt.hashpw('admin123'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+        'id': '1'
+    }
+}
+
+class User(UserMixin):
+    def __init__(self, user_id, username):
+        self.id = user_id
+        self.username = username
+
+@login_manager.user_loader
+def load_user(user_id):
+    for username, user_data in USERS.items():
+        if user_data['id'] == user_id:
+            return User(user_data['id'], username)
+    return None
+
+# פונקציית escape ל-HTML (מגנה מפני XSS)
+def escape_html(text):
+    """מבצע escape לכל התווים המיוחדים ב-HTML"""
+    if text is None:
+        return ''
+    return html.escape(str(text))
+
+def escape_html_attr(text):
+    """מבצע escape עבור attributes ב-HTML"""
+    if text is None:
+        return ''
+    text = str(text)
+    return html.escape(text).replace('"', '&quot;').replace("'", '&#x27;')
+
+# רשימת קבצים מותרים לסטטיק (מגן מפני Path Traversal)
+ALLOWED_STATIC_FILES = {
+    'index.html', 'logo.png', 'דמויות.png', 'דמויות.PNG',
+    'style.css', 'app.js', 'client.html', 'AgencyOS_Clean.html', 'AgencyOS_Fixed.html'
+}
+ALLOWED_STATIC_EXTENSIONS = {'.html', '.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.pdf'}
+
+# הגדרות העלאת קבצים
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+ALLOWED_UPLOAD_EXTENSIONS = {'.dat', '.csv', '.xlsx', '.xls'}
+ALLOWED_MIME_TYPES = {
+    'text/csv', 'application/vnd.ms-excel', 
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain', 'application/xml', 'text/xml'
+}
 
 # --- תבנית הדוח (HTML) ---
 # שינויים: הוספת Chart.js, הוספת סקריפטים לגרף, הוספת עמודת סימולציה, ועיצוב אזור המלצות
@@ -71,6 +152,7 @@ REPORT_TEMPLATE = """
                 direction: rtl !important;
             }
             .no-print { display: none !important; }
+            .coverage-modal { display: none !important; }
             /* אופטימיזציה של רווחים ב-PDF */
             .header { margin-bottom: 12px !important; padding-bottom: 8px !important; }
             .kpi-container { margin-bottom: 12px !important; padding: 12px !important; }
@@ -160,10 +242,25 @@ REPORT_TEMPLATE = """
         .mem-item strong { display: block; color: var(--accent); margin-bottom: 3px; font-size: 11pt; word-spacing: 0.1em; white-space: normal; }
 
         .checklist-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 12px; page-break-inside: avoid !important; }
-        .check-card { display: flex; flex-direction: column; align-items: center; justify-content: start; padding: 12px 5px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: center; position: relative; min-height: 85px; page-break-inside: avoid !important; word-spacing: 0.1em; white-space: normal; }
+        .check-card { display: flex; flex-direction: column; align-items: center; justify-content: start; padding: 12px 5px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: center; position: relative; min-height: 85px; page-break-inside: avoid !important; word-spacing: 0.1em; white-space: normal; cursor: pointer; transition: all 0.3s ease; }
+        .check-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .check-card.found { background: #f0fdf4; border-color: #86efac; color: #166534; }
         .check-card.warning { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
         .check-card.missing { background: #fef2f2; border-color: #fca5a5; color: #991b1b; opacity: 0.85; }
+        
+        /* Modal for coverage participants */
+        .coverage-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10000; display: none !important; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .coverage-modal.active { display: flex !important; }
+        .coverage-modal-content { background: white; width: 500px; max-width: 90vw; max-height: 80vh; padding: 30px; border-radius: 24px; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow-y: auto; direction: rtl; }
+        .coverage-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0; }
+        .coverage-modal-header h3 { margin: 0; font-size: 1.5rem; color: #1e293b; }
+        .coverage-modal-close { cursor: pointer; font-size: 1.5rem; color: #94a3b8; background: none; border: none; padding: 5px; }
+        .coverage-modal-close:hover { color: #1e293b; }
+        .coverage-participants-list { list-style: none; padding: 0; margin: 0; }
+        .coverage-participant-item { padding: 15px; margin-bottom: 10px; border-radius: 12px; border: 2px solid #e2e8f0; background: #f8fafc; transition: 0.3s; }
+        .coverage-participant-item:hover { border-color: #4f46e5; background: #eef2ff; }
+        .coverage-participant-name { font-weight: 600; font-size: 1.1rem; color: #1e293b; margin-bottom: 5px; }
+        .coverage-participant-details { font-size: 0.9rem; color: #64748b; }
         .check-icon { font-size: 16pt; margin-bottom: 8px; }
         .check-label { font-size: 9pt; font-weight: 700; margin-bottom: 3px; word-spacing: 0.1em; white-space: normal; }
         .check-status { font-size: 8pt; line-height: 1.1; word-spacing: 0.1em; white-space: normal; }
@@ -234,7 +331,7 @@ REPORT_TEMPLATE = """
             <div class="checklist-grid">{{ checklist_html | safe }}</div>
         </div>
 
-        <div style="page-break-inside: avoid;">
+        <div style="page-break-before: always; page-break-inside: avoid;">
             <div class="sec-title"><span>תיק ביטוחי</span> <i class="fas fa-shield-alt"></i></div>
             <table>
             <thead>
@@ -261,6 +358,10 @@ REPORT_TEMPLATE = """
                     <h4>התפלגות מוצרים</h4>
                     <canvas id="productChart" style="max-height: 180px !important;"></canvas>
                 </div>
+                <div class="chart-wrapper">
+                    <h4>חלוקה לפי הוני/קבצתי</h4>
+                    <canvas id="equityFixedChart" style="max-height: 180px !important;"></canvas>
+                </div>
             </div>
 
             {{ client_summary_html | safe }}
@@ -283,9 +384,10 @@ REPORT_TEMPLATE = """
             <table>
                 <thead>
                     <tr>
-                        <th style="width:30%">לקוח</th>
-                        <th style="width:35%">מספר מוצרים</th>
-                        <th style="width:35%">סה"כ סימולציה לפרישה</th>
+                        <th style="width:25%">לקוח</th>
+                        <th style="width:15%">מספר מוצרים</th>
+                        <th style="width:30%">קצבה עם הפקדות</th>
+                        <th style="width:30%">קבצה בלי הפקדות</th>
                     </tr>
                 </thead>
                 <tbody>{{ simulation_summary_html | safe }}</tbody>
@@ -295,10 +397,129 @@ REPORT_TEMPLATE = """
         <div class="footer">דוח זה הופק ע"י מערכת AgencyOS | כל הזכויות שמורות לאשר לוי סוכנות לביטוח )2011( בע"מ</div>
     </div>
 
+    <!-- Modal for Coverage Participants -->
+    <div id="coverageModal" class="coverage-modal" onclick="if(event.target===this) closeCoverageModal()">
+        <div class="coverage-modal-content" onclick="event.stopPropagation()">
+            <div class="coverage-modal-header">
+                <h3 id="coverageModalTitle">רשימת מבוטחים</h3>
+                <button class="coverage-modal-close" onclick="closeCoverageModal()">×</button>
+            </div>
+            <ul class="coverage-participants-list" id="coverageParticipantsList">
+                <!-- Participants will be inserted here -->
+            </ul>
+        </div>
+    </div>
+
     <script>
+        // פונקציית עזר ל-escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.toString().replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+        
+        // פונקציה להצגת רשימת מבוטחים מכרטיסייה (שימוש ב-data attributes)
+        function showCoverageParticipantsFromCard(cardElement) {
+            try {
+                const coverageKey = cardElement.getAttribute('data-coverage-key');
+                const coverageLabel = JSON.parse(cardElement.getAttribute('data-coverage-label'));
+                const membersWithCoverage = JSON.parse(cardElement.getAttribute('data-coverage-members'));
+                const allMembersAttr = cardElement.getAttribute('data-all-members');
+                const allMembers = allMembersAttr ? JSON.parse(allMembersAttr) : membersWithCoverage;
+                showCoverageParticipants(coverageKey, coverageLabel, membersWithCoverage, allMembers);
+            } catch (e) {
+                console.error('Error parsing coverage data:', e);
+                alert('שגיאה בטעינת נתוני הכיסוי');
+            }
+        }
+        
+        // פונקציה להצגת רשימת מבוטחים בכיסוי מסוים
+        function showCoverageParticipants(coverageKey, coverageLabel, membersWithCoverage, allMembers) {
+            const modal = document.getElementById('coverageModal');
+            const modalTitle = document.getElementById('coverageModalTitle');
+            const participantsList = document.getElementById('coverageParticipantsList');
+            
+            if (!modal || !modalTitle || !participantsList) {
+                console.error('Modal elements not found');
+                return;
+            }
+            
+            modalTitle.textContent = coverageLabel + ' - רשימת מבוטחים';
+            participantsList.innerHTML = '';
+            
+            // יצירת Set של מבוטחים עם כיסוי לבדיקה מהירה
+            const membersWithCoverageSet = new Set(membersWithCoverage || []);
+            
+            // תמיד נציג את כל המשפחה - allMembers תמיד יכיל את כל המשפחה
+            let membersToDisplay = [];
+            
+            if (allMembers && allMembers.length > 0) {
+                // יש רשימת כל המשפחה - נציג את כולם
+                membersToDisplay = allMembers.slice(); // עותק של הרשימה
+            } else {
+                // אם אין allMembers (fallback) - נשתמש ברשימה של מי שיש לו כיסוי
+                membersToDisplay = (membersWithCoverage || []).slice();
+            }
+            
+            // אם אין שום מבוטח להצגה
+            if (membersToDisplay.length === 0) {
+                participantsList.innerHTML = '<li class="coverage-participant-item"><div class="coverage-participant-name" style="text-align:center; color:#94a3b8;">אין מבוטחים בכיסוי זה</div></li>';
+                modal.classList.add('active');
+                return;
+            }
+            
+            // מיון: קודם ירוקים (יש כיסוי), אחר כך אדומים (אין כיסוי)
+            membersToDisplay.sort(function(a, b) {
+                const aHasCoverage = membersWithCoverageSet.has(a);
+                const bHasCoverage = membersWithCoverageSet.has(b);
+                if (aHasCoverage && !bHasCoverage) return -1; // a ירוק, b אדום - a קודם
+                if (!aHasCoverage && bHasCoverage) return 1;  // a אדום, b ירוק - b קודם
+                // שניהם באותו מצב - שמור על סדר אלפביתי
+                return a.localeCompare(b);
+            });
+            
+            // הצגת כל המבוטחים - מי שיש לו כיסוי בירוק, מי שאין לו באדום
+            membersToDisplay.forEach(function(member) {
+                const hasCoverage = membersWithCoverageSet.has(member);
+                const li = document.createElement('li');
+                li.className = 'coverage-participant-item';
+                
+                if (hasCoverage) {
+                    // יש כיסוי - ירוק
+                    li.style.borderColor = '#10b981';
+                    li.style.background = '#dcfce7';
+                    li.innerHTML = '<div class="coverage-participant-name" style="color:#166534;"><i class="fas fa-check-circle" style="color:#10b981; margin-left:8px;"></i>' + 
+                                   escapeHtml(member) + '</div>' +
+                                   '<div class="coverage-participant-details" style="color:#166534;">מבוטח בכיסוי ' + escapeHtml(coverageLabel) + '</div>';
+                } else {
+                    // אין כיסוי - אדום
+                    li.style.borderColor = '#ef4444';
+                    li.style.background = '#fee2e2';
+                    li.innerHTML = '<div class="coverage-participant-name" style="color:#991b1b;"><i class="fas fa-times-circle" style="color:#ef4444; margin-left:8px;"></i>' + 
+                                   escapeHtml(member) + '</div>' +
+                                   '<div class="coverage-participant-details" style="color:#991b1b;">ללא כיסוי ' + escapeHtml(coverageLabel) + '</div>';
+                }
+                participantsList.appendChild(li);
+            });
+            
+            modal.classList.add('active');
+        }
+        
+        // פונקציה לסגירת המודאל
+        function closeCoverageModal() {
+            document.getElementById('coverageModal').classList.remove('active');
+        }
+        
         // נתונים לגרפים
         const riskData = {{ risk_chart_data | tojson }};
         const productData = {{ product_chart_data | tojson }};
+        const equityFixedData = {{ equity_fixed_chart_data | tojson }};
 
         // יצירת גרף סיכון
         if (document.getElementById('riskChart')) {
@@ -413,6 +634,64 @@ REPORT_TEMPLATE = """
                         mode: 'nearest'
                     },
                     cutout: '60%'
+                }
+            });
+        }
+
+        // יצירת גרף הוני/קבצתי
+        if (document.getElementById('equityFixedChart')) {
+            new Chart(document.getElementById('equityFixedChart'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(equityFixedData),
+                    datasets: [{
+                        data: Object.values(equityFixedData),
+                        backgroundColor: ['#3b82f6', '#10b981'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff',
+                        hoverOffset: 15
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    aspectRatio: 1.1,
+                    animation: {
+                        animateRotate: true,
+                        animateScale: true,
+                        duration: 2000,
+                        easing: 'easeOutQuart'
+                    },
+                    plugins: { 
+                        legend: { 
+                            position: 'bottom',
+                            labels: {
+                                padding: 8,
+                                font: { size: 9, weight: '600' },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: { size: 13, weight: 'bold' },
+                            bodyFont: { size: 12 },
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
+                                    return label + ': ₪' + value.toLocaleString() + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'nearest'
+                    }
                 }
             });
         }
@@ -959,21 +1238,108 @@ def parse_dat_file(file_content):
                 else:
                     print(f"      ✓ יתרה מסוכמת מ-BlockItrot (PerutYitrot): {balance:.2f}")
                 
-                # דמי ניהול
-                hotzaot = None
+                # דמי ניהול - חיפוש השדות הנכונים
+                # חשוב: הערכים מ-SHEUR-DMEI-NIHUL-HISACHON-MIVNE ו-SHEUR-DMEI-NIHUL כבר באחוזים (0.75 = 0.75%)
+                # הערכים מ-SHEUR-DMEI-NIHUL-TZVIRA הם עשרוניים (0.0617 = 6.17%)
+                accumulation_fee_text = ''
+                deposit_fee_text = ''
+                accumulation_fee_source = ''  # נשמור מאיפה הערך בא
+                deposit_fee_source = ''  # נשמור מאיפה הערך בא
+                
+                # חיפוש ב-MivneDmeiNihul -> PerutMivneDmeiNihul -> SHEUR-DMEI-NIHUL
+                mivne_dmei_nihul = None
                 for elem in heshbon.iter():
-                    if strip_namespace(elem.tag) == 'HotzaotBafoalLehodeshDivoach':
-                        hotzaot = elem
+                    if strip_namespace(elem.tag) == 'MivneDmeiNihul':
+                        mivne_dmei_nihul = elem
                         break
                 
-                accumulation_fee_text = find_element_text(hotzaot, 'SHEUR-DMEI-NIHUL-TZVIRA', '') if hotzaot else ''
-                deposit_fee_text = find_element_text(hotzaot, 'SHEUR-DMEI-NIHUL-HAFKADA', '') if hotzaot else ''
+                if mivne_dmei_nihul:
+                    # חיפוש ב-PerutMivneDmeiNihul
+                    for perut in mivne_dmei_nihul.iter():
+                        if strip_namespace(perut.tag) == 'PerutMivneDmeiNihul':
+                            fee_val = find_element_text(perut, 'SHEUR-DMEI-NIHUL', '')
+                            if fee_val and not accumulation_fee_text:
+                                accumulation_fee_text = fee_val
+                                accumulation_fee_source = 'MivneDmeiNihul'  # כבר באחוזים
+                                print(f"      ✓ נמצא דמי ניהול מצבירה מ-MivneDmeiNihul: {fee_val}")
+                
+                # אם לא מצאנו, נחפש ב-PirteiTaktziv -> PerutMasluleiHashkaa -> SHEUR-DMEI-NIHUL-HISACHON-MIVNE
+                if not accumulation_fee_text:
+                    pirtei_taktziv = None
+                    for elem in heshbon.iter():
+                        if strip_namespace(elem.tag) == 'PirteiTaktziv':
+                            pirtei_taktziv = elem
+                            break
+                    
+                    if pirtei_taktziv:
+                        for elem in pirtei_taktziv.iter():
+                            if strip_namespace(elem.tag) == 'PerutMasluleiHashkaa':
+                                fee_val = find_element_text(elem, 'SHEUR-DMEI-NIHUL-HISACHON-MIVNE', '')
+                                if fee_val and not accumulation_fee_text:
+                                    accumulation_fee_text = fee_val
+                                    accumulation_fee_source = 'PerutMasluleiHashkaa'  # כבר באחוזים
+                                    print(f"      ✓ נמצא דמי ניהול מצבירה מ-PerutMasluleiHashkaa (תחת PirteiTaktziv): {fee_val}")
+                                    break
+                
+                # חיפוש דמי ניהול מהפקדה ב-PirteiTaktziv -> PerutMasluleiHashkaa
+                if not deposit_fee_text:
+                    pirtei_taktziv = None
+                    for elem in heshbon.iter():
+                        if strip_namespace(elem.tag) == 'PirteiTaktziv':
+                            pirtei_taktziv = elem
+                            break
+                    
+                    if pirtei_taktziv:
+                        for elem in pirtei_taktziv.iter():
+                            if strip_namespace(elem.tag) == 'PerutMasluleiHashkaa':
+                                fee_val = find_element_text(elem, 'SHEUR-DMEI-NIHUL-HAFKADA', '')
+                                if fee_val and not deposit_fee_text:
+                                    deposit_fee_text = fee_val
+                                    deposit_fee_source = 'PerutMasluleiHashkaa'  # כבר באחוזים
+                                    print(f"      ✓ נמצא דמי ניהול מהפקדה מ-PerutMasluleiHashkaa (תחת PirteiTaktziv): {fee_val}")
+                                    break
+                
+                # אם עדיין לא מצאנו, נשתמש ב-HotzaotBafoalLehodeshDivoach (fallback)
+                if not accumulation_fee_text or not deposit_fee_text:
+                    hotzaot = None
+                    for elem in heshbon.iter():
+                        if strip_namespace(elem.tag) == 'HotzaotBafoalLehodeshDivoach':
+                            hotzaot = elem
+                            break
+                    
+                    if hotzaot:
+                        if not accumulation_fee_text:
+                            accumulation_fee_text = find_element_text(hotzaot, 'SHEUR-DMEI-NIHUL-TZVIRA', '')
+                            if accumulation_fee_text:
+                                accumulation_fee_source = 'HotzaotBafoalLehodeshDivoach'  # עשרוני, צריך להכפיל
+                                print(f"      ⚠ שימוש ב-HotzaotBafoalLehodeshDivoach (fallback) לדמי ניהול מצבירה: {accumulation_fee_text}")
+                        if not deposit_fee_text:
+                            deposit_fee_text = find_element_text(hotzaot, 'SHEUR-DMEI-NIHUL-HAFKADA', '')
+                            if deposit_fee_text:
+                                deposit_fee_source = 'HotzaotBafoalLehodeshDivoach'  # גם באחוזים (1.0 = 1%)
+                                print(f"      ⚠ שימוש ב-HotzaotBafoalLehodeshDivoach (fallback) לדמי ניהול מהפקדה: {deposit_fee_text}")
                 
                 fee_parts = []
                 if accumulation_fee_text:
                     try:
                         acc_fee = float(accumulation_fee_text.replace(',', '').strip() or '0')
-                        acc_fee_pct = acc_fee * 100 if acc_fee < 1 and acc_fee > 0 else acc_fee
+                        # אם הערך בא מ-MivneDmeiNihul או PerutMasluleiHashkaa, הוא כבר באחוזים
+                        # אם הערך בא מ-HotzaotBafoalLehodeshDivoach, הוא עשרוני וצריך להכפיל ב-100
+                        if accumulation_fee_source in ['MivneDmeiNihul', 'PerutMasluleiHashkaa']:
+                            # הערך כבר באחוזים (0.75 = 0.75%, 0.02 = 0.02%)
+                            acc_fee_pct = acc_fee
+                        elif accumulation_fee_source == 'HotzaotBafoalLehodeshDivoach':
+                            # הערך עשרוני, צריך להכפיל ב-100 (0.0617 = 6.17%)
+                            acc_fee_pct = acc_fee * 100
+                        else:
+                            # fallback: אם לא יודעים מאיפה, נבדוק לפי הערך
+                            if 0.5 <= acc_fee <= 5.0:
+                                acc_fee_pct = acc_fee  # כבר באחוזים
+                            elif acc_fee < 0.5 and acc_fee > 0:
+                                acc_fee_pct = acc_fee * 100  # עשרוני
+                            else:
+                                acc_fee_pct = acc_fee  # כבר באחוזים
+                        
                         if acc_fee_pct > 0:
                             fee_parts.append(f"{acc_fee_pct:.2f}% צבירה")
                     except (ValueError, AttributeError):
@@ -982,7 +1348,10 @@ def parse_dat_file(file_content):
                 if deposit_fee_text:
                     try:
                         dep_fee = float(deposit_fee_text.replace(',', '').strip() or '0')
-                        dep_fee_pct = dep_fee * 100 if dep_fee < 1 and dep_fee > 0 else dep_fee
+                        # חשוב: כל הערכים של דמי ניהול מהפקדה הם כבר באחוזים!
+                        # בין אם הם באים מ-PerutMasluleiHashkaa או מ-HotzaotBafoalLehodeshDivoach
+                        # (1.0 = 1%, 1.8 = 1.8%) - לא להכפיל ב-100!
+                        dep_fee_pct = dep_fee  # תמיד באחוזים, לא להכפיל
                         if dep_fee_pct > 0:
                             fee_parts.append(f"{dep_fee_pct:.2f}% הפקדה")
                     except (ValueError, AttributeError):
@@ -1069,11 +1438,17 @@ def generate_single_html_report(data):
     total_risk = 0
     total_count = 0
     checklist_data = {k: set() for k in ['risk', 'health', 'ci', 'disability', 'accidents', 'nursing']}
-    fin_checklist_data = {k: {'products': set(), 'total': 0, 'count': 0} for k in ['pension', 'gemel', 'hishtalmut', 'managers', 'mutual', 'savings']}
+    # מפת הגנה משפחתית - נצטרך לבדוק אם יש לכל המשפחה
+    family_members = set(data.get('members', {}).keys())
+    checklist_by_member = {k: set() for k in ['risk', 'health', 'ci', 'disability', 'accidents', 'nursing']}
+    # איסוף סכומים עבור כל סוג כיסוי (במיוחד לאובדן כושר עבודה)
+    checklist_amounts = {k: 0 for k in ['risk', 'health', 'ci', 'disability', 'accidents', 'nursing']}
+    fin_checklist_data = {k: {'products': set(), 'total': 0, 'count': 0} for k in ['pension', 'gemel', 'hishtalmut', 'managers', 'gemel_investment']}
     
     # נתונים לגרפים
     risk_distribution = {}
     product_distribution = {}
+    equity_fixed_distribution = {'הוני': 0, 'קבצתי': 0}  # חלוקה לפי הוני/קבצתי
     
     # סיכום סימולציה לפי לקוח
     simulation_by_client = {}
@@ -1081,7 +1456,10 @@ def generate_single_html_report(data):
     members_html = ""
     if data['members']:
         for name, m in data['members'].items():
-            members_html += f'<div class="mem-item"><strong>{name}</strong><div>{m.get("age","")} {m.get("job","")}</div></div>'
+            name_escaped = escape_html(name)
+            age_escaped = escape_html(m.get("age",""))
+            job_escaped = escape_html(m.get("job",""))
+            members_html += f'<div class="mem-item"><strong>{name_escaped}</strong><div>{age_escaped} {job_escaped}</div></div>'
     else:
         members_html = '<div style="grid-column:1/-1;text-align:center;color:#999;">--</div>'
 
@@ -1113,13 +1491,59 @@ def generate_single_html_report(data):
             # סה"כ כל הכיסויים הביטוחיים (לא רק חיים/ריסק)
             total_risk += cov
             total_count += 1
-            if any(x in ptype for x in ['חיים', 'ריסק', 'מוות', 'משכנתא']): checklist_data['risk'].add(ptype)
-            if any(x in ptype for x in ['בריאות', 'ניתוח', 'השתל', 'תרופות', 'אמבולטורי', 'ליווי', 'שב"ן']): checklist_data['health'].add(ptype)
-            if any(x in ptype for x in ['מחלות', 'סרטן', 'גילוי']): checklist_data['ci'].add(ptype)
-            if any(x in ptype for x in ['כושר', 'נכות', 'א.כ.ע']): checklist_data['disability'].add(ptype)
-            if any(x in ptype for x in ['תאונות', 'שברים', 'נכויות']): checklist_data['accidents'].add(ptype)
-            if 'סיעוד' in ptype: checklist_data['nursing'].add(ptype)
-            ins_rows += f"""<tr><td class="font-bold">{r['client']}</td><td>{r['company']}</td><td><strong>{ptype}</strong></td><td>{r['policy']}</td><td>{r['start_date']}</td><td class="money">{f"₪{cov:,.2f}" if cov else '-'}</td><td class="money">{f"₪{prem:,.2f}" if prem else '-'}</td><td class="text-start">{r['notes']}</td></tr>"""
+            
+            # חלוקת שמות משותפים (כמו "אייל ואפרת" -> ["אייל", "אפרת"])
+            client_name = (r['client'] or '').strip()
+            client_names = []
+            
+            if client_name:
+                # חלוקה לפי פסיק, &, ו-ו' (ו' בעברית) - עם תמיכה ב-ו' עם רווח או בלי
+                # דוגמאות: "אייל ואפרת", "אייל,אפרת", "אייל&אפרת", "אייל ו אפרת"
+                parts = re.split(r'[,&]|\s+ו\s+|\s+ו\s*|^ו\s+', client_name)
+                for part in parts:
+                    name = part.strip()
+                    # בדיקה שהשם תקין - לא ריק, לא מספר, לא תאריך
+                    if name and len(name) > 1:
+                        # בדיקה שזה לא מספר
+                        if not name.replace('.', '').replace('-', '').isdigit():
+                            # בדיקה שזה לא תאריך
+                            if not re.match(r'^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$', name):
+                                client_names.append(name)
+            
+            # אם לא הצלחנו לחלק, נשתמש בשם המקורי
+            if not client_names:
+                client_names = [client_name] if client_name else []
+            
+            # הוספה לכל סוג כיסוי - לכל שם בנפרד
+            for client in client_names:
+                if any(x in ptype for x in ['חיים', 'ריסק', 'מוות', 'משכנתא']): 
+                    checklist_data['risk'].add(ptype)
+                    checklist_by_member['risk'].add(client)
+                if any(x in ptype for x in ['בריאות', 'ניתוח', 'השתל', 'תרופות', 'אמבולטורי', 'ליווי', 'שב"ן']): 
+                    checklist_data['health'].add(ptype)
+                    checklist_by_member['health'].add(client)
+                if any(x in ptype for x in ['מחלות', 'סרטן', 'גילוי']): 
+                    checklist_data['ci'].add(ptype)
+                    checklist_by_member['ci'].add(client)
+                if any(x in ptype for x in ['כושר', 'נכות', 'א.כ.ע']): 
+                    checklist_data['disability'].add(ptype)
+                    checklist_by_member['disability'].add(client)
+                    checklist_amounts['disability'] += cov  # הוספת הסכום לאובדן כושר עבודה
+                if any(x in ptype for x in ['תאונות', 'שברים', 'נכויות']): 
+                    checklist_data['accidents'].add(ptype)
+                    checklist_by_member['accidents'].add(client)
+                if 'סיעוד' in ptype: 
+                    checklist_data['nursing'].add(ptype)
+                    checklist_by_member['nursing'].add(client)
+            # הצגת סכום לאובדן כושר עבודה - הסכום תמיד מוצג, אבל חשוב במיוחד לא.כ.ע
+            coverage_display = f"₪{cov:,.2f}" if cov else '-'
+            client_escaped = escape_html(r['client'])
+            company_escaped = escape_html(r['company'])
+            ptype_escaped = escape_html(ptype)
+            policy_escaped = escape_html(r['policy'])
+            start_date_escaped = escape_html(r['start_date'])
+            notes_escaped = escape_html(r['notes'])
+            ins_rows += f"""<tr><td class="font-bold">{client_escaped}</td><td>{company_escaped}</td><td><strong>{ptype_escaped}</strong></td><td>{policy_escaped}</td><td>{start_date_escaped}</td><td class="money">{coverage_display}</td><td class="money">{f"₪{prem:,.2f}" if prem else '-'}</td><td class="text-start">{notes_escaped}</td></tr>"""
         if total_prem > 0: ins_rows += f'<tr class="sum-row"><td colspan="6" class="text-start">סה"כ פרמיה חודשית:</td><td class="money">₪{total_prem:,.2f}</td><td></td></tr>'
     else:
         ins_rows = '<tr><td colspan="8" style="padding:20px; color:#999;">אין נתוני ביטוח</td></tr>'
@@ -1129,17 +1553,89 @@ def generate_single_html_report(data):
         {'key': 'health', 'label': 'בריאות פרטי', 'icon': 'fa-user-doctor'},
         {'key': 'ci', 'label': 'מחלות קשות', 'icon': 'fa-virus'},
         {'key': 'disability', 'label': 'אובדן כושר', 'icon': 'fa-wheelchair'},
-        {'key': 'accidents', 'label': 'תאונות אישיות', 'icon': 'fa-car-crash'},
+        {'key': 'accidents', 'label': 'תאונות אישיות', 'icon': 'fa-user-shield'},
         {'key': 'nursing', 'label': 'ביטוח סיעודי', 'icon': 'fa-hands-holding-circle'},
     ]
     checklist_html = ""
     for item in checklist_config:
         found_items = checklist_data[item['key']]
         is_found = len(found_items) > 0
-        css = "found" if is_found else "missing"
-        icon = "fas fa-check" if is_found else "fas fa-times"
-        txt = ", ".join(list(found_items)) if is_found else "חסר / לבדיקה"
-        checklist_html += f'<div class="check-card {css}"><i class="fas {item["icon"]} check-icon"></i><div class="check-label">{item["label"]}</div><div class="check-status">{txt}</div></div>'
+        
+        # בדיקה אם יש כיסוי לכל המשפחה (או לכל מי שצריך להיות מכוסה)
+        has_for_all_family = False
+        
+        # קביעת מי צריך להיות מכוסה לפי סוג הכיסוי
+        members_that_need_coverage = []
+        if item['key'] in ['risk', 'disability']:
+            # ביטוח חיים וכושר עבודה - רק להורים
+            parents = [m for m in family_members if 'ילד' not in str(data.get('members', {}).get(m, {}).get('job', ''))]
+            members_that_need_coverage = parents if parents else []
+        else:
+            # כל השאר - לכל המשפחה
+            members_that_need_coverage = list(family_members) if family_members else []
+        
+        # בדיקה אם יש כיסוי לכל מי שצריך להיות מכוסה
+        if members_that_need_coverage:
+            members_with_coverage = checklist_by_member[item['key']]
+            # בדיקה אם כל מי שצריך להיות מכוסה אכן מכוסה
+            # נרמול שמות - הסרת רווחים מיותרים והשוואה case-insensitive
+            members_that_need_coverage_normalized = {m.strip().lower(): m.strip() for m in members_that_need_coverage}
+            members_with_coverage_normalized = {m.strip().lower() for m in members_with_coverage}
+            
+            # בדיקה אם כל מי שצריך להיות מכוסה אכן מכוסה
+            has_for_all_family = all(
+                normalized_key in members_with_coverage_normalized 
+                for normalized_key in members_that_need_coverage_normalized.keys()
+            )
+            
+            # Debug logging
+            if not has_for_all_family and is_found:
+                missing = [
+                    members_that_need_coverage_normalized[n] 
+                    for n in members_that_need_coverage_normalized.keys() 
+                    if n not in members_with_coverage_normalized
+                ]
+                if missing:
+                    print(f"⚠ {item['label']}: חסרים {len(missing)} מבוטחים - {missing}")
+                    print(f"   צריך: {sorted([m.strip() for m in members_that_need_coverage])}")
+                    print(f"   יש: {sorted([m.strip() for m in members_with_coverage])}")
+        
+        # ירוק רק אם יש כיסוי לכל המשפחה (או לכל מי שצריך), אחרת אדום
+        css = "found" if (is_found and has_for_all_family) else "missing"
+        icon = "fas fa-check" if (is_found and has_for_all_family) else "fas fa-times"
+        if is_found:
+            # Escape כל הפריטים שנמצאו
+            escaped_items = [escape_html(item) for item in found_items]
+            txt = ", ".join(escaped_items)
+        else:
+            txt = "חסר / לבדיקה"
+        
+        # הוספת סכום לאובדן כושר עבודה
+        if item['key'] == 'disability' and checklist_amounts['disability'] > 0:
+            txt += f"<br><strong style='font-size:9pt;'>₪{checklist_amounts['disability']:,.2f}</strong>"
+        
+        label_escaped = escape_html(item["label"])
+        # יצירת רשימת מבוטחים עבור כרטיסייה זו
+        # members_with_coverage = מי שיש לו כיסוי בכיסוי זה
+        members_with_coverage = list(checklist_by_member[item['key']])
+        # all_members = תמיד כל המשפחה - נציג את כולם עם הסטטוס שלהם
+        all_family_members = sorted(list(family_members)) if family_members else []
+        
+        # שימוש ב-data attributes עם JSON שנשמר בצורה בטוחה
+        try:
+            members_with_coverage_json = json.dumps(members_with_coverage, ensure_ascii=False)
+            all_members_json = json.dumps(all_family_members, ensure_ascii=False)
+            members_with_coverage_attr = members_with_coverage_json.replace('&', '&amp;').replace('"', '&quot;')
+            all_members_attr = all_members_json.replace('&', '&amp;').replace('"', '&quot;')
+            label_json_str = json.dumps(label_escaped, ensure_ascii=False)
+            label_json_attr = label_json_str.replace('&', '&amp;').replace('"', '&quot;')
+            key_escaped = item["key"].replace('&', '&amp;').replace('"', '&quot;')
+            
+            checklist_html += f'<div class="check-card {css}" data-coverage-key="{key_escaped}" data-coverage-label="{label_json_attr}" data-coverage-members="{members_with_coverage_attr}" data-all-members="{all_members_attr}" onclick="showCoverageParticipantsFromCard(this)"><i class="fas {item["icon"]} check-icon"></i><div class="check-label">{label_escaped}</div><div class="check-status">{txt}</div></div>'
+        except Exception as e:
+            print(f"⚠ שגיאה ביצירת checklist HTML עבור {item['key']}: {e}")
+            # Fallback - בלי data attributes
+            checklist_html += f'<div class="check-card {css}"><i class="fas {item["icon"]} check-icon"></i><div class="check-label">{label_escaped}</div><div class="check-status">{txt}</div></div>'
 
     # סיכום לפי מבוטח
     client_summary = {}
@@ -1163,8 +1659,27 @@ def generate_single_html_report(data):
             # צבירת נתונים לגרפים
             if risk:
                 risk_distribution[risk] = risk_distribution.get(risk, 0) + bal
+                # חלוקה לפי הוני/קבצתי (מופיע במסלקה)
+                risk_lower = risk.lower()
+                if 'הוני' in risk or 'מניות' in risk or 'סיכון' in risk or 'equity' in risk_lower:
+                    equity_fixed_distribution['הוני'] += bal
+                elif 'קבצתי' in risk or 'קבוע' in risk or 'אג"ח' in risk or 'fixed' in risk_lower or 'אגרות' in risk:
+                    equity_fixed_distribution['קבצתי'] += bal
+                else:
+                    # אם לא מזוהה, ננסה לזהות לפי שם המוצר
+                    prod_lower = prod.lower()
+                    if 'הוני' in prod or 'מניות' in prod or 'equity' in prod_lower:
+                        equity_fixed_distribution['הוני'] += bal
+                    elif 'קבצתי' in prod or 'קבוע' in prod or 'אג"ח' in prod or 'fixed' in prod_lower:
+                        equity_fixed_distribution['קבצתי'] += bal
             else:
                 risk_distribution['לא ידוע'] = risk_distribution.get('לא ידוע', 0) + bal
+                # ננסה לזהות לפי שם המוצר
+                prod_lower = prod.lower()
+                if 'הוני' in prod or 'מניות' in prod or 'equity' in prod_lower:
+                    equity_fixed_distribution['הוני'] += bal
+                elif 'קבצתי' in prod or 'קבוע' in prod or 'אג"ח' in prod or 'fixed' in prod_lower:
+                    equity_fixed_distribution['קבצתי'] += bal
             
             # צבירת נתונים לגרף מוצרים (פנסיה, השתלמות וכו')
             prod_type_key = 'אחר'
@@ -1185,12 +1700,18 @@ def generate_single_html_report(data):
             else:
                 client_summary[client]['inactive'] += 1
             
-            # איסוף סימולציה לפי לקוח
+            # איסוף סימולציה לפי לקוח - קצבה עם הפקדות וקבצה בלי הפקדות
             if client not in simulation_by_client:
-                simulation_by_client[client] = {'total_simulation': 0, 'product_count': 0}
+                simulation_by_client[client] = {'annuity_with_deposits': 0, 'fixed_without_deposits': 0, 'product_count': 0}
             simulation_by_client[client]['product_count'] += 1
+            # זיהוי סוג סימולציה לפי סוג המוצר
             if sim and sim > 0:
-                simulation_by_client[client]['total_simulation'] += sim
+                if 'פנסיה' in prod or 'קצבה' in prod:
+                    # קצבה עם הפקדות
+                    simulation_by_client[client]['annuity_with_deposits'] += sim
+                else:
+                    # קבצה בלי הפקדות
+                    simulation_by_client[client]['fixed_without_deposits'] += sim
             
             # זיהוי סוג מוצר פיננסי לצ'ק ליסט
             if not prod: continue
@@ -1207,34 +1728,38 @@ def generate_single_html_report(data):
                 fin_checklist_data['hishtalmut']['total'] += bal
                 fin_checklist_data['hishtalmut']['count'] += 1
             elif ('גמל' in prod_clean and 'קופת' in prod_clean) or 'ק.גמל' in prod_clean:
-                fin_checklist_data['gemel']['products'].add(prod_clean)
-                fin_checklist_data['gemel']['total'] += bal
-                fin_checklist_data['gemel']['count'] += 1
+                # בדיקה אם זה קופת גמל להשקעה או רגיל
+                if 'השקעה' in prod_clean or 'להשקעה' in prod_clean:
+                    fin_checklist_data['gemel_investment']['products'].add(prod_clean)
+                    fin_checklist_data['gemel_investment']['total'] += bal
+                    fin_checklist_data['gemel_investment']['count'] += 1
+                else:
+                    fin_checklist_data['gemel']['products'].add(prod_clean)
+                    fin_checklist_data['gemel']['total'] += bal
+                    fin_checklist_data['gemel']['count'] += 1
             elif ('מנהלים' in prod_clean and 'ביטוח' in prod_clean) or 'ב.מנהלים' in prod_clean:
                 fin_checklist_data['managers']['products'].add(prod_clean)
                 fin_checklist_data['managers']['total'] += bal
                 fin_checklist_data['managers']['count'] += 1
-            elif 'נאמנות' in prod_clean:
-                fin_checklist_data['mutual']['products'].add(prod_clean)
-                fin_checklist_data['mutual']['total'] += bal
-                fin_checklist_data['mutual']['count'] += 1
-            elif 'חסכון' in prod_clean or 'פיקדון' in prod_clean:
-                fin_checklist_data['savings']['products'].add(prod_clean)
-                fin_checklist_data['savings']['total'] += bal
-                fin_checklist_data['savings']['count'] += 1
             
             # בניית השורה בטבלה
             status_class = 'style="opacity:0.6;"' if 'מסולק' in status else ''
             sim_display = f"₪{sim:,.2f}" if sim > 0 else "-"
+            client_escaped = escape_html(r['client'])
+            product_escaped = escape_html(r['product'])
+            company_escaped = escape_html(r['company'])
+            risk_escaped = escape_html(risk)
+            fee_escaped = escape_html(r['fee'])
+            status_escaped = escape_html(r['status'])
             fin_rows += f"""<tr {status_class}>
-                <td class="font-bold">{r['client']}</td>
-                <td><strong>{r['product']}</strong></td>
-                <td>{r['company']}</td>
-                <td style="font-size:9pt;">{risk}</td>
+                <td class="font-bold">{client_escaped}</td>
+                <td><strong>{product_escaped}</strong></td>
+                <td>{company_escaped}</td>
+                <td style="font-size:9pt;">{risk_escaped}</td>
                 <td class="money" style="color:#166534;font-weight:bold;">{f"₪{bal:,.2f}" if bal else '-'}</td>
                 <td class="money" style="color:#2563eb;">{sim_display}</td>
-                <td>{r['fee']}</td>
-                <td>{r['status']}</td>
+                <td>{fee_escaped}</td>
+                <td>{status_escaped}</td>
             </tr>"""
 
         if total_sav > 0: fin_rows += f'<tr class="sum-row"><td colspan="4" class="text-start">סה"כ נכסים:</td><td class="money">₪{total_sav:,.2f}</td><td colspan="3"></td></tr>'
@@ -1251,10 +1776,9 @@ def generate_single_html_report(data):
     fin_checklist_config = [
         {'key': 'pension', 'label': 'קרן פנסיה', 'icon': 'fa-piggy-bank'},
         {'key': 'gemel', 'label': 'קופת גמל', 'icon': 'fa-wallet'},
+        {'key': 'gemel_investment', 'label': 'קופת גמל להשקעה', 'icon': 'fa-chart-line'},
         {'key': 'hishtalmut', 'label': 'קרן השתלמות', 'icon': 'fa-graduation-cap'},
         {'key': 'managers', 'label': 'ביטוח מנהלים', 'icon': 'fa-briefcase'},
-        {'key': 'mutual', 'label': 'קרנות נאמנות', 'icon': 'fa-chart-pie'},
-        {'key': 'savings', 'label': 'חסכונות', 'icon': 'fa-coins'},
     ]
     for item in fin_checklist_config:
         cat_data = fin_checklist_data[item['key']]
@@ -1266,11 +1790,12 @@ def generate_single_html_report(data):
         elif is_found: css, icon = "warning", "fas fa-exclamation-triangle"
         else: css, icon = "missing", "fas fa-times"
         if is_found:
-            product_names = list(found_items)[:2]
+            product_names = [escape_html(name) for name in list(found_items)[:2]]
             txt = ", ".join(product_names) + (f" +{len(found_items)-2}" if len(found_items)>2 else "")
             if total_amount > 0: txt += f"<br><strong style='font-size:9pt;'>₪{total_amount:,.2f}</strong>"
         else: txt = "חסר / לבדיקה"
-        fin_checklist_html += f'<div class="check-card {css}"><i class="fas {item["icon"]} check-icon"></i><div class="check-label">{item["label"]}</div><div class="check-status">{txt}</div></div>'
+        label_escaped = escape_html(item["label"])
+        fin_checklist_html += f'<div class="check-card {css}"><i class="fas {item["icon"]} check-icon"></i><div class="check-label">{label_escaped}</div><div class="check-status">{txt}</div></div>'
     
     # סיכום לפי מבוטח
     client_summary_html = ""
@@ -1279,29 +1804,36 @@ def generate_single_html_report(data):
         for client, summary in sorted(client_summary.items()):
             active_pct = (summary['active'] / summary['count'] * 100) if summary['count'] > 0 else 0
             status_color = '#10b981' if active_pct >= 50 else '#f59e0b' if active_pct > 0 else '#ef4444'
+            client_escaped = escape_html_attr(client)  # Escape עבור JavaScript attribute
+            client_display = escape_html(client)  # Escape עבור תצוגה
             client_summary_html += f'''<div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
-                <strong class="clickable-client" style="color:#ec4899; display:block; margin-bottom:5px; cursor:pointer;" onclick="window.parent.postMessage({{type:'showClientProducts', clientName:'{client}'}}, '*');" title="לחץ לראות מוצרים">{client}</strong>
+                <strong class="clickable-client" style="color:#ec4899; display:block; margin-bottom:5px; cursor:pointer;" onclick="window.parent.postMessage({{type:'showClientProducts', clientName:'{client_escaped}'}}, '*');" title="לחץ לראות מוצרים">{client_display}</strong>
                 <div style="font-size:9pt; color:#64748b;">סה"כ: <strong style="color:#166534;">₪{summary['total']:,}</strong></div>
                 <div style="font-size:9pt; color:#64748b;">{summary['count']} מוצרים | <span style="color:{status_color};">{summary['active']} פעילים</span></div>
             </div>'''
         client_summary_html += '</div>'
     
-    # בניית טבלת סיכום סימולציה לפי לקוח
+    # בניית טבלת סיכום סימולציה לפי לקוח - קצבה עם הפקדות וקבצה בלי הפקדות
     simulation_summary_html = ""
     if simulation_by_client:
-        total_simulation_all = 0
+        total_annuity = 0
+        total_fixed = 0
         for client, sim_data in sorted(simulation_by_client.items()):
-            total_sim = sim_data['total_simulation']
             product_count = sim_data['product_count']
-            total_simulation_all += total_sim
-            sim_display = f"₪{total_sim:,.2f}" if total_sim > 0 else "-"
-            simulation_summary_html += f'<tr><td class="font-bold text-start">{client}</td><td>{product_count}</td><td class="money" style="color:#2563eb;font-weight:bold;">{sim_display}</td></tr>'
+            annuity = sim_data.get('annuity_with_deposits', 0)
+            fixed = sim_data.get('fixed_without_deposits', 0)
+            total_annuity += annuity
+            total_fixed += fixed
+            annuity_display = f"₪{annuity:,.2f}" if annuity > 0 else "-"
+            fixed_display = f"₪{fixed:,.2f}" if fixed > 0 else "-"
+            client_escaped = escape_html(client)
+            simulation_summary_html += f'<tr><td class="font-bold text-start">{client_escaped}</td><td>{product_count}</td><td class="money" style="color:#2563eb;font-weight:bold;">{annuity_display}</td><td class="money" style="color:#10b981;font-weight:bold;">{fixed_display}</td></tr>'
         
-        # שורת סיכום
-        if total_simulation_all > 0:
-            simulation_summary_html += f'<tr class="sum-row"><td colspan="2" class="text-start">סה"כ סימולציה לפרישה:</td><td class="money" style="color:#2563eb;font-weight:bold;">₪{total_simulation_all:,.2f}</td></tr>'
+        # שורות סיכום
+        if total_annuity > 0 or total_fixed > 0:
+            simulation_summary_html += f'<tr class="sum-row"><td colspan="2" class="text-start">סה"כ:</td><td class="money" style="color:#2563eb;font-weight:bold;">₪{total_annuity:,.2f}</td><td class="money" style="color:#10b981;font-weight:bold;">₪{total_fixed:,.2f}</td></tr>'
     else:
-        simulation_summary_html = '<tr><td colspan="3" style="padding:20px; color:#999;">אין נתוני סימולציה</td></tr>'
+        simulation_summary_html = '<tr><td colspan="4" style="padding:20px; color:#999;">אין נתוני סימולציה</td></tr>'
     
     return REPORT_TEMPLATE.replace('{{ family_name }}', data['family_name']) \
                           .replace('{{ date }}', datetime.now().strftime("%d/%m/%Y")) \
@@ -1317,7 +1849,8 @@ def generate_single_html_report(data):
                           .replace('{{ total_risk }}', f"{total_risk:,.2f}") \
                           .replace('{{ total_count }}', str(total_count)) \
                           .replace('{{ risk_chart_data | tojson }}', json.dumps(risk_distribution)) \
-                          .replace('{{ product_chart_data | tojson }}', json.dumps(product_distribution))
+                          .replace('{{ product_chart_data | tojson }}', json.dumps(product_distribution)) \
+                          .replace('{{ equity_fixed_chart_data | tojson }}', json.dumps(equity_fixed_distribution))
 
 def generate_recommendations_data(data):
     # פונקציה זו מחזירה נתונים גולמיים ל-Frontend אם צריך (לשימוש בדשבורד)
@@ -1325,11 +1858,64 @@ def generate_recommendations_data(data):
     return []
 
 # --- נתיבי Flask ---
+@app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        if not username or not password:
+            return jsonify({"error": "שם משתמש וסיסמה נדרשים"}), 400
+        
+        if username in USERS:
+            user_data = USERS[username]
+            if bcrypt.checkpw(password.encode('utf-8'), user_data['password_hash'].encode('utf-8')):
+                user = User(user_data['id'], username)
+                login_user(user)
+                return jsonify({"success": True, "message": "התחברות הצליחה"})
+        
+        return jsonify({"error": "שם משתמש או סיסמה שגויים"}), 401
+    
+    return jsonify({"message": "נא להתחבר"})
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"success": True, "message": "התנתקות הצליחה"})
+
+@app.route('/check_auth')
+def check_auth():
+    return jsonify({"authenticated": current_user.is_authenticated})
+
 @app.route('/')
-def index(): return send_from_directory('.', 'index.html')
+def index(): 
+    return send_from_directory('.', 'index.html')
 
 @app.route('/<path:path>')
-def serve_static(path): return send_from_directory('.', path)
+def serve_static(path):
+    # הגנה מפני Path Traversal
+    path_obj = Path(path)
+    
+    # בדיקה שהנתיב לא מכיל .. או /
+    if '..' in path or path_obj.is_absolute():
+        return jsonify({"error": "נתיב לא חוקי"}), 403
+    
+    # בדיקה אם הקובץ ברשימת הקבצים המותרים
+    filename = path_obj.name
+    if filename in ALLOWED_STATIC_FILES:
+        return send_from_directory('.', path)
+    
+    # בדיקה לפי סיומת
+    if path_obj.suffix.lower() in ALLOWED_STATIC_EXTENSIONS:
+        # בדיקה שהקובץ בתיקיית הפרויקט בלבד
+        full_path = Path('.').resolve() / path
+        if not str(full_path).startswith(str(Path('.').resolve())):
+            return jsonify({"error": "נתיב לא חוקי"}), 403
+        return send_from_directory('.', path)
+    
+    return jsonify({"error": "קובץ לא מורשה"}), 403
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
