@@ -154,6 +154,22 @@
         button:focus-visible, .tab-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
         .upload-zone:focus-within { border-color: var(--primary); }
         
+        /* File List Styles */
+        .files-list-container { max-height: 300px; overflow-y: auto; margin: 20px 0; text-align: right; }
+        .file-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; margin-bottom: 8px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; transition: 0.3s; }
+        .file-item:hover { background: #fdf2f8; border-color: var(--primary); }
+        .file-info { flex: 1; display: flex; align-items: center; gap: 10px; }
+        .file-icon { color: var(--primary); font-size: 1.2rem; }
+        .file-details { flex: 1; }
+        .file-name { font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+        .file-size { font-size: 0.85rem; color: #64748b; }
+        .file-remove-btn { background: #fee2e2; color: #dc2626; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: 0.3s; font-size: 0.9rem; }
+        .file-remove-btn:hover { background: #dc2626; color: white; }
+        .files-count { text-align: center; margin: 15px 0; padding: 10px; background: #fdf2f8; border-radius: 12px; color: var(--primary); font-weight: 600; }
+        .btn-clear-files { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; padding: 10px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.3s; margin-top: 10px; width: 100%; }
+        .btn-clear-files:hover { background: #fee2e2; color: #dc2626; border-color: #dc2626; }
+        .btn-clear-files:disabled { opacity: 0.5; cursor: not-allowed; }
+        
         /* Modal styles - עיצוב משופר עם אנימציות */
         .client-modal { 
             display: none; 
@@ -335,8 +351,17 @@
                 <div class="upload-text">גרור קבצים לכאן או לחץ לבחירה</div>
                 <input type="file" id="fileInput" multiple accept=".csv, .xlsx, .xls, .dat" style="display:none" aria-label="בחירת קבצים">
             </div>
-            <div id="fileList" style="text-align:right; margin-bottom:20px;"></div>
+            <div id="filesCount" class="files-count" style="display: none;">
+                <i class="fas fa-file me-2"></i><span id="filesCountText">0 קבצים נבחרו</span>
+            </div>
+            <div id="filesList" class="files-list-container" style="display: none;">
+                <!-- Files will be inserted here -->
+            </div>
+            <div id="fileList" style="text-align:right; margin-bottom:20px; display:none;"></div>
             <div class="loader" id="loader"></div>
+            <button class="btn-clear-files" id="btnClearFiles" onclick="clearAllFiles()" style="display: none;" disabled>
+                <i class="fas fa-trash me-2"></i>נקה כל הקבצים
+            </button>
             <button class="generate-btn" id="generateBtn" onclick="uploadFiles()" aria-label="צור דשבורד מהקבצים שנבחרו"><i class="fas fa-magic"></i> צור דשבורד</button>
         </div>
     </div>
@@ -397,6 +422,7 @@
 
         let reportsData = []; 
         let activeReportIndex = 0;
+        let selectedFiles = []; // רשימת קבצים שנבחרו להעלאה
 
         // Validation של קבצים
         function validateFiles(files) {
@@ -426,7 +452,6 @@
 
         fileInput.addEventListener('change', (e) => {
             const files = e.target.files;
-            fileList.innerHTML = '';
             
             if (files.length > 0) {
                 const errors = validateFiles(files);
@@ -436,17 +461,84 @@
                     return;
                 }
                 
-                generateBtn.style.display = 'inline-block';
+                // הוספת קבצים חדשים לרשימה (מניעת כפילויות)
                 Array.from(files).forEach(file => {
-                    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                    fileList.innerHTML += `<div style="margin:5px 0; padding:8px; background:#f8fafc; border-radius:6px;">
-                        <i class="fas fa-check" style="color:#10b981; margin-left:8px;"></i> 
-                        <strong>${file.name}</strong> 
-                        <span style="color:#64748b; font-size:0.9em;">(${sizeMB} MB)</span>
-                    </div>`;
+                    const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified);
+                    if(!exists) {
+                        selectedFiles.push(file);
+                    }
                 });
+                
+                // איפוס input כדי לאפשר בחירה חוזרת של אותו קובץ
+                fileInput.value = '';
+                
+                // עדכון תצוגת הרשימה
+                updateFilesDisplay();
             }
         });
+        
+        // פונקציה לעדכון תצוגת רשימת הקבצים
+        function updateFilesDisplay() {
+            const filesList = document.getElementById('filesList');
+            const filesCount = document.getElementById('filesCount');
+            const filesCountText = document.getElementById('filesCountText');
+            const generateBtn = document.getElementById('generateBtn');
+            const btnClearFiles = document.getElementById('btnClearFiles');
+            
+            if(selectedFiles.length === 0) {
+                filesList.style.display = 'none';
+                filesCount.style.display = 'none';
+                generateBtn.style.display = 'none';
+                btnClearFiles.style.display = 'none';
+            } else {
+                filesList.style.display = 'block';
+                filesCount.style.display = 'block';
+                generateBtn.style.display = 'inline-block';
+                btnClearFiles.style.display = 'block';
+                btnClearFiles.disabled = false;
+                
+                // עדכון ספירת קבצים
+                filesCountText.innerText = `${selectedFiles.length} ${selectedFiles.length === 1 ? 'קובץ נבחר' : 'קבצים נבחרו'}`;
+                
+                // עדכון רשימת הקבצים
+                filesList.innerHTML = '';
+                selectedFiles.forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    
+                    const fileSize = (file.size / 1024).toFixed(2); // KB
+                    const fileSizeText = fileSize < 1024 ? `${fileSize} KB` : `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+                    
+                    fileItem.innerHTML = `
+                        <div class="file-info">
+                            <i class="fas fa-file-excel file-icon"></i>
+                            <div class="file-details">
+                                <div class="file-name">${file.name}</div>
+                                <div class="file-size">${fileSizeText}</div>
+                            </div>
+                        </div>
+                        <button class="file-remove-btn" onclick="removeFileFromQueue(${index})" title="הסר קובץ">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    filesList.appendChild(fileItem);
+                });
+            }
+        }
+
+        // פונקציה להסרת קובץ מהרשימה
+        function removeFileFromQueue(index) {
+            if(index >= 0 && index < selectedFiles.length) {
+                selectedFiles.splice(index, 1);
+                updateFilesDisplay();
+            }
+        }
+
+        // פונקציה לניקוי כל הקבצים
+        function clearAllFiles() {
+            selectedFiles = [];
+            updateFilesDisplay();
+        }
 
         // Drag & Drop support
         const dropZone = document.getElementById('dropZone');
@@ -480,27 +572,42 @@
             const dt = e.dataTransfer;
             const files = dt.files;
             if (files.length > 0) {
-                fileInput.files = files;
-                fileInput.dispatchEvent(new Event('change'));
+                // הוספת קבצים חדשים לרשימה (מניעת כפילויות)
+                Array.from(files).forEach(file => {
+                    const errors = validateFiles([file]);
+                    if (errors.length > 0) {
+                        alert('שגיאות:\n' + errors.join('\n'));
+                        return;
+                    }
+                    
+                    const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified);
+                    if(!exists) {
+                        selectedFiles.push(file);
+                    }
+                });
+                
+                updateFilesDisplay();
             }
         }, false);
 
         async function uploadFiles(isAdditionalUpload = false) {
-            if (fileInput.files.length === 0) {
+            if (selectedFiles.length === 0) {
                 alert('אנא בחר קבצים להעלאה');
                 return;
             }
             
+            const filesToProcess = [...selectedFiles]; // עותק של הרשימה
+            const processedFileNames = filesToProcess.map(f => f.name);
+            
             if (!isAdditionalUpload) {
                 generateBtn.style.display = 'none'; 
                 loader.style.display = 'block';
-                fileList.innerHTML = '<div style="text-align:center; color:#64748b;">מעלה קבצים...</div>';
             } else {
                 showProgress('מעלה קבצים נוספים...');
             }
             
             const formData = new FormData();
-            for (const file of fileInput.files) formData.append('files[]', file);
+            for (const file of filesToProcess) formData.append('files[]', file);
 
             try {
                 const response = await fetch('/upload', { 
@@ -526,6 +633,10 @@
                     showToast('warning', 'אזהרה', 'לא נמצאו נתונים בעיבוד הקבצים. אנא ודא שהקבצים מכילים נתונים תקינים.');
                     return; 
                 }
+                
+                // הסרת הקבצים שעובדו מהרשימה (אבל לא ניקוי מלא - כדי לאפשר הוספת קבצים נוספים)
+                selectedFiles = selectedFiles.filter(f => !processedFileNames.includes(f.name));
+                updateFilesDisplay();
                 
                 if (isAdditionalUpload && reportsData.length > 0) {
                     // מיזוג הדוחות החדשים עם הקיימים
@@ -581,30 +692,9 @@
         }
         
         function showAddFilesDialog() {
-            // איפוס ה-input כדי לאפשר בחירה מחדש
-            fileInput.value = '';
+            // פתיחת דיאלוג בחירת קבצים
             fileInput.click();
-            
-            // הוספת event listener חד-פעמי
-            const handleAddFiles = async (e) => {
-                const files = e.target.files;
-                if (files.length > 0) {
-                    const errors = validateFiles(files);
-                    if (errors.length > 0) {
-                        showToast('error', 'שגיאה', 'שגיאות בקבצים:\n' + errors.join('\n'));
-                        fileInput.value = '';
-                        return;
-                    }
-                    
-                    // הסרת ה-listener
-                    fileInput.removeEventListener('change', handleAddFiles);
-                    
-                    // העלאה
-                    await uploadFiles(true);
-                }
-            };
-            
-            fileInput.addEventListener('change', handleAddFiles, { once: true });
+            // הקבצים יתווספו לרשימה דרך ה-event listener הקיים
         }
 
         // Toast Notification System

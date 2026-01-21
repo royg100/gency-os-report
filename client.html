@@ -64,6 +64,42 @@
         }
         .drop-zone:hover { border-color: var(--primary); background: #eff6ff; }
         .close-btn { position: absolute; top: 20px; right: 20px; cursor: pointer; font-size: 1.5rem; color: #94a3b8; }
+        .close-btn:hover { color: #1e293b; }
+
+        /* Participants Modal */
+        .participants-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2001; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .participants-modal.active { display: flex; }
+        .participants-content { background: white; width: 500px; max-width: 90vw; max-height: 80vh; padding: 30px; border-radius: 24px; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow-y: auto; }
+        .participants-list { margin-top: 20px; }
+        .participant-item { padding: 15px; margin-bottom: 10px; border-radius: 12px; border: 2px solid #e2e8f0; transition: 0.3s; display: flex; align-items: center; justify-content: space-between; }
+        .participant-item:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .participant-item.has-coverage { background: #dcfce7; border-color: #10b981; color: #166534; }
+        .participant-name { font-weight: 600; font-size: 1.1rem; }
+        .participant-status { display: flex; align-items: center; gap: 8px; }
+        .coverage-badge { background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+        .no-coverage-badge { background: #f1f5f9; color: #64748b; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; }
+        .cube-icon { cursor: pointer; padding: 8px; border-radius: 8px; transition: 0.3s; color: #64748b; }
+        .cube-icon:hover { background: #eef2ff; color: var(--primary); transform: rotate(90deg); }
+
+        /* File List Styles */
+        .files-list-container { max-height: 300px; overflow-y: auto; margin: 20px 0; text-align: right; }
+        .file-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; margin-bottom: 8px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; transition: 0.3s; }
+        .file-item:hover { background: #eff6ff; border-color: var(--primary); }
+        .file-info { flex: 1; display: flex; align-items: center; gap: 10px; }
+        .file-icon { color: var(--primary); font-size: 1.2rem; }
+        .file-details { flex: 1; }
+        .file-name { font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+        .file-size { font-size: 0.85rem; color: #64748b; }
+        .file-remove-btn { background: #fee2e2; color: #dc2626; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: 0.3s; font-size: 0.9rem; }
+        .file-remove-btn:hover { background: #dc2626; color: white; }
+        .files-count { text-align: center; margin: 15px 0; padding: 10px; background: #eef2ff; border-radius: 12px; color: var(--primary); font-weight: 600; }
+        .modal-actions { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+        .btn-process { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 50px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-process:hover { background: #4338ca; transform: translateY(-2px); }
+        .btn-process:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; }
+        .btn-clear { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; padding: 12px 30px; border-radius: 50px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-clear:hover { background: #fee2e2; color: #dc2626; border-color: #dc2626; }
+        .btn-clear:disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* Tables */
         .styled-table { width: 100%; border-collapse: collapse; }
@@ -230,9 +266,37 @@
                 <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
                 <h5>לחץ כאן לבחירת קבצים</h5>
             </div>
+
+            <div id="filesCount" class="files-count" style="display: none;">
+                <i class="fas fa-file me-2"></i><span id="filesCountText">0 קבצים נבחרו</span>
+            </div>
+
+            <div id="filesList" class="files-list-container" style="display: none;">
+                <!-- Files will be inserted here -->
+            </div>
             
-            <div class="text-start bg-light p-3 rounded small text-muted">
-                <i class="fas fa-info-circle me-1"></i> המערכת תזהה אוטומטית משפחות לפי שמות הקבצים ותאחד נתונים.
+            <div class="modal-actions">
+                <button id="btnProcess" class="btn-process" onclick="processAllFiles()" disabled>
+                    <i class="fas fa-play me-2"></i>עבד קבצים
+                </button>
+                <button id="btnClear" class="btn-clear" onclick="clearAllFiles()" disabled>
+                    <i class="fas fa-trash me-2"></i>נקה הכל
+                </button>
+            </div>
+            
+            <div class="text-start bg-light p-3 rounded small text-muted mt-3">
+                <i class="fas fa-info-circle me-1"></i> המערכת תזהה אוטומטית משפחות לפי שמות הקבצים ותאחד נתונים. ניתן להוסיף עוד קבצים בכל עת.
+            </div>
+        </div>
+    </div>
+
+    <div id="participantsModal" class="participants-modal" onclick="if(event.target===this) closeParticipantsModal()">
+        <div class="participants-content" onclick="event.stopPropagation()">
+            <i class="fas fa-times close-btn" onclick="closeParticipantsModal()"></i>
+            <h3 class="fw-bold mb-3"><i class="fas fa-users me-2"></i>רשימת מבוטחים</h3>
+            <p class="text-muted mb-3" id="participantsFamilyName"></p>
+            <div class="participants-list" id="participantsList">
+                <!-- Participants will be inserted here -->
             </div>
         </div>
     </div>
@@ -244,6 +308,7 @@
         let Families = {};
         let currentFamilyKey = null;
         let ChartP = null, ChartB = null, MainChart = null;
+        let selectedFiles = []; // רשימת קבצים שנבחרו להעלאה
 
         // --- Auth ---
         document.getElementById('pass').addEventListener('keypress', e => { if(e.key==='Enter') login(); });
@@ -274,17 +339,161 @@
         }
 
         // --- Modal Logic ---
-        function openUploadModal() { document.getElementById('uploadModal').style.display = 'flex'; }
-        function closeUploadModal() { document.getElementById('uploadModal').style.display = 'none'; }
+        function openUploadModal() { 
+            document.getElementById('uploadModal').style.display = 'flex';
+            updateFilesDisplay();
+        }
+        function closeUploadModal() { 
+            // הרשימה נשמרת גם אחרי סגירת המודאל
+            document.getElementById('uploadModal').style.display = 'none';
+        }
+
+        // --- Participants Modal Logic ---
+        function showParticipants(familyName) {
+            const fam = Families[familyName];
+            if (!fam) return;
+
+            const modal = document.getElementById('participantsModal');
+            const familyNameEl = document.getElementById('participantsFamilyName');
+            const participantsList = document.getElementById('participantsList');
+
+            familyNameEl.innerText = `משפחת ${familyName}`;
+            participantsList.innerHTML = '';
+
+            const members = Object.keys(fam.members);
+            if (members.length === 0) {
+                participantsList.innerHTML = '<p class="text-muted text-center">אין מבוטחים רשומים</p>';
+                modal.classList.add('active');
+                return;
+            }
+
+            members.forEach(memberName => {
+                const member = fam.members[memberName];
+                // בדיקה אם יש כיסוי - אם יש ביטוחים עם סכום כיסוי
+                const hasCoverage = member.ins && member.ins.length > 0 && 
+                                   member.ins.some(ins => ins.cov && ins.cov > 0);
+                
+                const totalCoverage = member.ins.reduce((sum, ins) => sum + (ins.cov || 0), 0);
+
+                const item = document.createElement('div');
+                item.className = `participant-item ${hasCoverage ? 'has-coverage' : ''}`;
+                item.innerHTML = `
+                    <div>
+                        <div class="participant-name">${memberName}</div>
+                        ${hasCoverage ? `<small class="text-success">כיסוי כולל: ₪${totalCoverage.toLocaleString()}</small>` : ''}
+                    </div>
+                    <div class="participant-status">
+                        ${hasCoverage ? 
+                            '<span class="coverage-badge"><i class="fas fa-check-circle me-1"></i>יש כיסוי</span>' : 
+                            '<span class="no-coverage-badge"><i class="fas fa-times-circle me-1"></i>ללא כיסוי</span>'
+                        }
+                    </div>
+                `;
+                participantsList.appendChild(item);
+            });
+
+            modal.classList.add('active');
+        }
+
+        function closeParticipantsModal() {
+            document.getElementById('participantsModal').classList.remove('active');
+        }
 
         // --- File Engine ---
-        async function processFiles(files) {
+        function processFiles(files) {
+            if(!files || files.length === 0) return;
+            
+            // הוספת קבצים חדשים לרשימה (מניעת כפילויות)
+            Array.from(files).forEach(file => {
+                // בדיקה אם הקובץ כבר קיים (לפי שם וגודל)
+                const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified);
+                if(!exists) {
+                    selectedFiles.push(file);
+                }
+            });
+            
+            // איפוס input כדי לאפשר בחירה חוזרת של אותו קובץ
+            document.getElementById('fileInput').value = '';
+            
+            // עדכון תצוגת הרשימה
+            updateFilesDisplay();
+        }
+
+        // פונקציה לעדכון תצוגת רשימת הקבצים
+        function updateFilesDisplay() {
+            const filesList = document.getElementById('filesList');
+            const filesCount = document.getElementById('filesCount');
+            const filesCountText = document.getElementById('filesCountText');
+            const btnProcess = document.getElementById('btnProcess');
+            const btnClear = document.getElementById('btnClear');
+            
+            if(selectedFiles.length === 0) {
+                filesList.style.display = 'none';
+                filesCount.style.display = 'none';
+                btnProcess.disabled = true;
+                btnClear.disabled = true;
+            } else {
+                filesList.style.display = 'block';
+                filesCount.style.display = 'block';
+                btnProcess.disabled = false;
+                btnClear.disabled = false;
+                
+                // עדכון ספירת קבצים
+                filesCountText.innerText = `${selectedFiles.length} ${selectedFiles.length === 1 ? 'קובץ נבחר' : 'קבצים נבחרו'}`;
+                
+                // עדכון רשימת הקבצים
+                filesList.innerHTML = '';
+                selectedFiles.forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    
+                    const fileSize = (file.size / 1024).toFixed(2); // KB
+                    const fileSizeText = fileSize < 1024 ? `${fileSize} KB` : `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+                    
+                    fileItem.innerHTML = `
+                        <div class="file-info">
+                            <i class="fas fa-file-excel file-icon"></i>
+                            <div class="file-details">
+                                <div class="file-name">${file.name}</div>
+                                <div class="file-size">${fileSizeText}</div>
+                            </div>
+                        </div>
+                        <button class="file-remove-btn" onclick="removeFileFromQueue(${index})" title="הסר קובץ">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    filesList.appendChild(fileItem);
+                });
+            }
+        }
+
+        // פונקציה להסרת קובץ מהרשימה
+        function removeFileFromQueue(index) {
+            if(index >= 0 && index < selectedFiles.length) {
+                selectedFiles.splice(index, 1);
+                updateFilesDisplay();
+            }
+        }
+
+        // פונקציה לניקוי כל הקבצים
+        function clearAllFiles() {
+            selectedFiles = [];
+            updateFilesDisplay();
+        }
+
+        // פונקציה לעיבוד כל הקבצים
+        async function processAllFiles() {
+            if(selectedFiles.length === 0) return;
+            
+            const filesToProcess = [...selectedFiles]; // עותק של הרשימה
+            const processedFileNames = filesToProcess.map(f => f.name);
+            
             closeUploadModal();
-            if(!files.length) return;
             Swal.fire({title:'מפענח ומסדר נתונים...', html:'בונה תיקים משפחתיים...', didOpen:()=>Swal.showLoading()});
             
             let count = 0;
-            for(let f of files) {
+            
+            for(let f of filesToProcess) {
                 // זיהוי שם משפחה משם הקובץ
                 let familyName = f.name.replace(/\.(xlsx|xls|csv)$/i, '')
                                        .replace(/ניתוח תיק.*/, '')
@@ -300,8 +509,16 @@
                 count++;
             }
             
+            // הסרת הקבצים שעובדו מהרשימה (אבל לא ניקוי מלא - כדי לאפשר הוספת קבצים נוספים)
+            selectedFiles = selectedFiles.filter(f => !processedFileNames.includes(f.name));
+            
             updateHomeStats();
-            Swal.fire('הצלחה', `נקלטו ${count} קבצים ל-${Object.keys(Families).length} משפחות`, 'success');
+            Swal.fire('הצלחה', `נקלטו ${count} קבצים ל-${Object.keys(Families).length} משפחות`, 'success').then(() => {
+                // פתיחת המודאל מחדש אם יש עוד קבצים ברשימה
+                if(selectedFiles.length > 0) {
+                    openUploadModal();
+                }
+            });
         }
 
         function readFile(file, familyKey) {
@@ -402,15 +619,18 @@
                 const div = document.createElement('div');
                 div.className = 'col-md-4';
                 div.innerHTML = `
-                    <div class="card-box family-card" onclick="loadFamily('${fName}')">
+                    <div class="card-box family-card">
                         <div class="d-flex justify-content-between mb-3">
-                            <h4 class="fw-bold m-0 text-primary">${fName}</h4>
-                            <i class="fas fa-users text-muted"></i>
+                            <h4 class="fw-bold m-0 text-primary" style="cursor: pointer;" onclick="loadFamily('${fName}')">${fName}</h4>
+                            <div class="d-flex gap-2 align-items-center">
+                                <i class="fas fa-cube cube-icon" onclick="event.stopPropagation(); showParticipants('${fName}')" title="צפה במבוטחים"></i>
+                                <i class="fas fa-users text-muted"></i>
+                            </div>
                         </div>
-                        <div class="mb-3 text-muted small">
+                        <div class="mb-3 text-muted small" onclick="loadFamily('${fName}')" style="cursor: pointer;">
                             ${members.join(', ')}
                         </div>
-                        <div class="row text-center mt-3 pt-3 border-top">
+                        <div class="row text-center mt-3 pt-3 border-top" onclick="loadFamily('${fName}')" style="cursor: pointer;">
                             <div class="col">
                                 <div class="stat-label">פרמיה</div>
                                 <div class="fw-bold">₪${fPrem.toLocaleString()}</div>
