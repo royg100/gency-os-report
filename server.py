@@ -25,8 +25,9 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 CORS(app, resources={
     r"/*": {
         "origins": os.environ.get('ALLOWED_ORIGINS', 'http://localhost:5000').split(','),
-        "methods": ["GET", "POST"],
-        "allow_headers": ["Content-Type"]
+        "methods": ["GET", "POST", "PUT", "DELETE"],
+        "allow_headers": ["Content-Type"],
+        "supports_credentials": True
     }
 })
 
@@ -42,14 +43,112 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# משתמשים (בסביבת ייצור יש לשמור במסד נתונים)
-# סיסמה: admin123 (hash עם bcrypt)
-USERS = {
-    'admin': {
-        'password_hash': bcrypt.hashpw('admin123'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
-        'id': '1'
+# --- אחסון משתמשים והפקות (data/users.json, data/productions.json) ---
+DATA_DIR = Path(__file__).resolve().parent / 'data'
+USERS_PATH = DATA_DIR / 'users.json'
+PRODUCTIONS_PATH = DATA_DIR / 'productions.json'
+
+# ADMIN קבוע: שם ADMIN, סיסמה R!2345i
+ADMIN_USERNAME = 'ADMIN'
+ADMIN_PASSWORD_HASH = bcrypt.hashpw('R!2345i'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+ADMIN_ID = '0'
+
+def _load_users_json():
+    try:
+        with open(USERS_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+def _save_users_json(data):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(USERS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def get_users_dict():
+    """מחזיר dict: username -> {password_hash, id, role, created_at}. כולל ADMIN."""
+    out = {
+        ADMIN_USERNAME: {
+            'password_hash': ADMIN_PASSWORD_HASH,
+            'id': ADMIN_ID,
+            'role': 'admin',
+            'created_at': None
+        }
     }
-}
+    for u in _load_users_json():
+        out[u['username']] = {
+            'password_hash': u['password_hash'],
+            'id': str(u['id']),
+            'role': u.get('role', 'user'),
+            'created_at': u.get('created_at')
+        }
+    return out
+
+def user_by_id(user_id):
+    for uname, ud in get_users_dict().items():
+        if ud['id'] == str(user_id):
+            return (uname, ud)
+    return (None, None)
+
+def create_user(username, password):
+    users = _load_users_json()
+    if any(u['username'] == username for u in users) or username == ADMIN_USERNAME:
+        return False, 'משתמש כבר קיים'
+    next_id = str(max([int(u['id']) for u in users], default=0) + 1)
+    h = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    users.append({
+        'username': username, 'password_hash': h, 'id': next_id,
+        'role': 'user', 'created_at': datetime.utcnow().isoformat()
+    })
+    _save_users_json(users)
+    return True, next_id
+
+def update_user_password(user_id, new_password):
+    users = _load_users_json()
+    for u in users:
+        if str(u['id']) == str(user_id):
+            u['password_hash'] = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            _save_users_json(users)
+            return True
+    return False
+
+def delete_user(user_id):
+    if str(user_id) == ADMIN_ID:
+        return False
+    users = _load_users_json()
+    users = [u for u in users if str(u['id']) != str(user_id)]
+    _save_users_json(users)
+    return True
+
+def _load_productions_json():
+    try:
+        with open(PRODUCTIONS_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+def _save_productions_json(data):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(PRODUCTIONS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def append_production(user_id, username, family_name, file_count, file_names=None):
+    rec = {
+        'user_id': str(user_id), 'username': username,
+        'timestamp': datetime.utcnow().isoformat(),
+        'family_name': family_name or 'כללי', 'file_count': file_count,
+        'file_names': file_names or []
+    }
+    data = _load_productions_json()
+    data.append(rec)
+    _save_productions_json(data)
+
+def get_productions(user_id=None, limit=50):
+    data = _load_productions_json()
+    if user_id is not None:
+        data = [p for p in data if p.get('user_id') == str(user_id)]
+    data = sorted(data, key=lambda p: p.get('timestamp', ''), reverse=True)
+    return data[:limit]
 
 class User(UserMixin):
     def __init__(self, user_id, username):
@@ -58,9 +157,10 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    for username, user_data in USERS.items():
-        if user_data['id'] == user_id:
-            return User(user_data['id'], username)
+    uname, _ = user_by_id(user_id)
+    if uname:
+        ud = get_users_dict()[uname]
+        return User(ud['id'], uname)
     return None
 
 # פונקציית escape ל-HTML (מגנה מפני XSS)
@@ -77,9 +177,9 @@ def escape_html_attr(text):
     text = str(text)
     return html.escape(text).replace('"', '&quot;').replace("'", '&#x27;')
 
-# רשימת קבצים מותרים לסטטיק (מגן מפני Path Traversal)
+# רשימת קבצים מותרים לסטטיק (מגן מפני Path Traversal). index.html לא כאן – נמסר רק דרך / עם אימות.
 ALLOWED_STATIC_FILES = {
-    'index.html', 'logo.png', 'דמויות.png', 'דמויות.PNG',
+    'logo.png', 'דמויות.png', 'דמויות.PNG',
     'style.css', 'app.js', 'client.html', 'AgencyOS_Clean.html', 'AgencyOS_Fixed.html'
 }
 ALLOWED_STATIC_EXTENSIONS = {'.html', '.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.pdf'}
@@ -1868,8 +1968,9 @@ def login():
         if not username or not password:
             return jsonify({"error": "שם משתמש וסיסמה נדרשים"}), 400
         
-        if username in USERS:
-            user_data = USERS[username]
+        users = get_users_dict()
+        if username in users:
+            user_data = users[username]
             if bcrypt.checkpw(password.encode('utf-8'), user_data['password_hash'].encode('utf-8')):
                 user = User(user_data['id'], username)
                 login_user(user)
@@ -1877,26 +1978,122 @@ def login():
         
         return jsonify({"error": "שם משתמש או סיסמה שגויים"}), 401
     
-    return jsonify({"message": "נא להתחבר"})
+    return send_from_directory('templates', 'login.html')
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return jsonify({"success": True, "message": "התנתקות הצליחה"})
+    return redirect(url_for('login'))
 
 @app.route('/check_auth')
 def check_auth():
-    return jsonify({"authenticated": current_user.is_authenticated})
+    out = {"authenticated": current_user.is_authenticated}
+    if current_user.is_authenticated:
+        out["username"] = getattr(current_user, 'username', None)
+    return jsonify(out)
+
+def admin_required(f):
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify({"error": "נדרשת התחברות"}), 401
+        if getattr(current_user, 'username', None) != ADMIN_USERNAME:
+            return jsonify({"error": "גישה מנהלים בלבד"}), 403
+        return f(*args, **kwargs)
+    return wrapped
+
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_page():
+    return send_from_directory('templates', 'admin.html')
+
+@app.route('/admin/users', methods=['GET'])
+@login_required
+@admin_required
+def admin_list_users():
+    users = _load_users_json()
+    out = [{"id": u["id"], "username": u["username"], "role": u.get("role", "user"), "created_at": u.get("created_at")} for u in users]
+    out.insert(0, {"id": ADMIN_ID, "username": ADMIN_USERNAME, "role": "admin", "created_at": None})
+    return jsonify(out)
+
+@app.route('/admin/users', methods=['POST'])
+@login_required
+@admin_required
+def admin_create_user():
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    if not username or not password:
+        return jsonify({"error": "שם משתמש וסיסמה נדרשים"}), 400
+    ok, msg = create_user(username, password)
+    if not ok:
+        return jsonify({"error": msg}), 400
+    return jsonify({"success": True, "id": msg})
+
+@app.route('/admin/users/<user_id>', methods=['PUT'])
+@login_required
+@admin_required
+def admin_update_user(user_id):
+    data = request.get_json(silent=True) or {}
+    new_password = data.get("password") or ""
+    if not new_password:
+        return jsonify({"error": "סיסמה נדרשת"}), 400
+    if not update_user_password(user_id, new_password):
+        return jsonify({"error": "משתמש לא נמצא"}), 404
+    return jsonify({"success": True})
+
+@app.route('/admin/users/<user_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_user(user_id):
+    if not delete_user(user_id):
+        return jsonify({"error": "לא ניתן למחוק את ADMIN"}), 400
+    return jsonify({"success": True})
+
+@app.route('/admin/productions')
+@login_required
+@admin_required
+def admin_productions():
+    user_id = request.args.get("user_id")
+    limit = int(request.args.get("limit", 50))
+    data = get_productions(user_id=user_id if user_id else None, limit=limit)
+    return jsonify(data)
+
+@app.route('/render_report', methods=['POST'])
+@login_required
+def render_report():
+    """מקבל raw_data (raw_ins, raw_fin, members) ומחזיר HTML מעודכן – לשימוש אחרי מיזוג 'הוסף קבצים'."""
+    if not current_user.is_authenticated:
+        return jsonify({"error": "נדרשת התחברות"}), 401
+    data = request.get_json(silent=True) or {}
+    raw = data.get("raw_data") or data
+    merged = {
+        "family_name": raw.get("family_name") or "כללי",
+        "members": raw.get("members") or {},
+        "raw_ins": raw.get("raw_ins") or [],
+        "raw_fin": raw.get("raw_fin") or [],
+    }
+    try:
+        html_content = generate_single_html_report(merged)
+        return jsonify({"html": html_content})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/')
-def index(): 
+@login_required
+def index():
     return send_from_directory('.', 'index.html')
 
 @app.route('/<path:path>')
 def serve_static(path):
     # הגנה מפני Path Traversal
     path_obj = Path(path)
+    
+    # index.html נמסר רק דרך / עם אימות – לא דרך סטטיק
+    if path.strip().lower() == 'index.html':
+        return jsonify({"error": "קובץ לא מורשה"}), 403
     
     # בדיקה שהנתיב לא מכיל .. או /
     if '..' in path or path_obj.is_absolute():
@@ -1919,6 +2116,8 @@ def serve_static(path):
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
+    if not current_user.is_authenticated:
+        return jsonify({"error": "נדרשת התחברות"}), 401
     if 'files[]' not in request.files: return jsonify({"error": "No files"}), 400
     files = request.files.getlist('files[]')
     grouped_reports = {} 
@@ -2432,6 +2631,14 @@ def upload_files():
             "members": merged_data.get("members", {})
         }
     }]
+
+    append_production(
+        current_user.id,
+        getattr(current_user, 'username', ''),
+        "כללי",
+        len(files),
+        [f.filename for f in files]
+    )
 
     return jsonify(results)
 

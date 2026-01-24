@@ -1,0 +1,75 @@
+[
+  {
+    "user_id": "0",
+    "username": "ADMIN",
+    "timestamp": "2026-01-24T07:23:23.983788",
+    "family_name": "כללי",
+    "file_count": 9,
+    "file_names": [
+      "0m_0y_o_101000514813450CONSLTINP009202511251131016164.DAT",
+      "0m_0y_o_101000514813450CONSLTKGM009202511251131016165.DAT",
+      "0m_1y_o_101000514813450CONSLTPNN009202511251101036160.DAT",
+      "0m_0y_o_101000514813450CONSLTING009202601131400586150.DAT",
+      "0m_0y_o_101000514813450CONSLTKGM009202601131430506116.DAT",
+      "0m_0y_o_101000514813450CONSLTPNN009202601131530466140.DAT",
+      "0m_0y_o_101000514813450CONSLTPNN009202601140230176140.DAT",
+      "0m_1y_o_101000514813450CONSLTING009202601131400586150.DAT",
+      "1m_0y_o_101000514813450CONSLTKGM009202601131430506116.DAT"
+    ]
+  },
+  {
+    "user_id": "1",
+    "username": "שירה",
+    "timestamp": "2026-01-24T07:24:12.405044",
+    "family_name": "כללי",
+    "file_count": 1,
+    "file_names": [
+      "0m_0y_o_101000514813450CONSLTING009202601131400586150.DAT"
+    ]
+  },
+  {
+    "user_id": "0",
+    "username": "ADMIN",
+    "timestamp": "2026-01-24T07:29:19.193074",
+    "family_name": "כללי",
+    "file_count": 1,
+    "file_names": [
+      "0m_0y_o_101000514813450CONSLTING009202601131400586150.DAT"
+    ]
+  },
+  {
+    "user_id": "0",
+    "username": "ADMIN",
+    "timestamp": "2026-01-24T07:31:13.308575",
+    "family_name": "כללי",
+    "file_count": 1,
+    "file_names": [
+      "0m_0y_o_101000514813450CONSLTPNN009202601140230176140.DAT"
+    ]
+  },
+  {
+    "user_id": "0",
+    "username": "ADMIN",
+    "timestamp": "2026-01-24T07:36:31.668950",
+    "family_name": "כללי",
+    "file_count": 6,
+    "file_names": [
+      "0m_0y_o_101000514813450CONSLTING009202601131400586150.DAT",
+      "0m_0y_o_101000514813450CONSLTKGM009202601131430506116.DAT",
+      "0m_0y_o_101000514813450CONSLTPNN009202601131530466140.DAT",
+      "0m_0y_o_101000514813450CONSLTPNN009202601140230176140.DAT",
+      "0m_1y_o_101000514813450CONSLTING009202601131400586150.DAT",
+      "1m_0y_o_101000514813450CONSLTKGM009202601131430506116.DAT"
+    ]
+  },
+  {
+    "user_id": "0",
+    "username": "ADMIN",
+    "timestamp": "2026-01-24T07:36:40.024752",
+    "family_name": "כללי",
+    "file_count": 1,
+    "file_names": [
+      "אייל ניתוח תיק 25.xlsx"
+    ]
+  }
+]

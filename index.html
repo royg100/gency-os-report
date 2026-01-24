@@ -21,7 +21,9 @@
 
         /* מסך העלאה */
         #uploadView { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; padding: 20px; }
-        .upload-container { background: var(--white); width: 100%; max-width: 600px; padding: 50px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; }
+        .upload-container { background: var(--white); width: 100%; max-width: 600px; padding: 50px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; position: relative; }
+        .upload-admin-link { position: absolute; top: 20px; left: 20px; background: var(--secondary); color: white; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .upload-admin-link:hover { background: #1e293b; color: white; }
         .logo { font-size: 3.5rem; color: var(--primary); margin-bottom: 15px; }
         .upload-zone { border: 2px dashed #cbd5e1; border-radius: 16px; padding: 50px 20px; cursor: pointer; transition: all 0.3s ease; background: #fdfdfd; margin: 20px 0; }
         .upload-zone:hover { border-color: var(--primary); background: #fdf2f8; transform: scale(1.01); }
@@ -37,6 +39,8 @@
         .top-actions { display: flex; gap: 10px; }
         .top-actions button { background: rgba(255,255,255,0.1); border: none; color: white; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; display: flex; align-items: center; gap: 6px; }
         .top-actions button:hover { background: rgba(255,255,255,0.2); }
+        .top-admin-link { background: rgba(255,255,255,0.1); border: none; color: white; padding: 8px 15px; border-radius: 6px; font-size: 0.9rem; transition: background 0.2s; display: flex; align-items: center; gap: 6px; text-decoration: none; }
+        .top-admin-link:hover { background: rgba(255,255,255,0.2); color: white; }
         .btn-pdf { background: var(--success) !important; font-weight: 600; }
         .btn-pdf:hover { background: #059669 !important; }
         .btn-print { background: var(--primary) !important; font-weight: 600; }
@@ -343,6 +347,7 @@
 
     <div id="uploadView">
         <div class="upload-container">
+            <a href="/admin" id="adminLinkUpload" class="upload-admin-link" style="display: none;"><i class="fas fa-cog"></i> ניהול</a>
             <div class="logo"><i class="fas fa-layer-group"></i></div>
             <h1>מבט 360</h1>
             <p>גרור את כל קבצי האקסל והדאט לכאן</p>
@@ -370,6 +375,7 @@
         <div class="top-bar">
             <div class="app-brand"><i class="fas fa-layer-group"></i> AgencyOS 360</div>
             <div class="top-actions">
+                <a href="/admin" id="adminLinkWrap" class="top-admin-link" style="display: none;"><i class="fas fa-cog"></i> ניהול</a>
                 <button class="btn-add-files" onclick="showAddFilesDialog()" aria-label="הוסף עוד קבצים" style="background: #3b82f6 !important; font-weight: 600;"><i class="fas fa-plus-circle"></i> הוסף קבצים</button>
                 <button class="btn-pdf" onclick="downloadActiveReport()" aria-label="הורד דוח PDF של הדוח הנוכחי"><i class="fas fa-file-download"></i> הורד PDF מלא</button>
                 <button class="btn-excel" onclick="exportToExcel()" aria-label="ייצא ל-Excel" style="background: #10b981 !important; font-weight: 600;"><i class="fas fa-file-excel"></i> ייצוא Excel</button>
@@ -424,6 +430,17 @@
         let activeReportIndex = 0;
         let selectedFiles = []; // רשימת קבצים שנבחרו להעלאה
 
+        fetch('/check_auth', { credentials: 'include' })
+            .then(r => r.json())
+            .then(d => {
+                if (!d.authenticated || d.username !== 'ADMIN') return;
+                const wrap = document.getElementById('adminLinkWrap');
+                if (wrap) wrap.style.display = 'flex';
+                const up = document.getElementById('adminLinkUpload');
+                if (up) up.style.display = 'flex';
+            })
+            .catch(() => {});
+
         // Validation של קבצים
         function validateFiles(files) {
             const maxSize = 10 * 1024 * 1024; // 10MB
@@ -461,19 +478,22 @@
                     return;
                 }
                 
-                // הוספת קבצים חדשים לרשימה (מניעת כפילויות)
+                const onDashboard = reportsData.length > 0 && dashboardView.style.display === 'flex';
+                const added = [];
                 Array.from(files).forEach(file => {
                     const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified);
-                    if(!exists) {
+                    if (!exists) {
                         selectedFiles.push(file);
+                        added.push(file);
                     }
                 });
                 
-                // איפוס input כדי לאפשר בחירה חוזרת של אותו קובץ
                 fileInput.value = '';
-                
-                // עדכון תצוגת הרשימה
                 updateFilesDisplay();
+
+                if (onDashboard && added.length > 0) {
+                    uploadFiles(true);
+                }
             }
         });
         
@@ -613,10 +633,14 @@
                 const response = await fetch('/upload', { 
                     method: 'POST', 
                     body: formData,
-                    // הוספת timeout
-                    signal: AbortSignal.timeout(120000) // 2 דקות
+                    credentials: 'include',
+                    signal: AbortSignal.timeout(120000)
                 });
                 
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
                 if (!response.ok) {
                     throw new Error(`שגיאת שרת: ${response.status} ${response.statusText}`);
                 }
@@ -639,23 +663,34 @@
                 updateFilesDisplay();
                 
                 if (isAdditionalUpload && reportsData.length > 0) {
-                    // מיזוג הדוחות החדשים עם הקיימים
-                    const existingFamilyKeys = new Set(reportsData.map(r => r.family_name));
+                    const fam = (r) => r.family || r.family_name || 'כללי';
+                    const existingFamilyKeys = new Set(reportsData.map(fam));
                     for (const newReport of data) {
-                        if (existingFamilyKeys.has(newReport.family_name)) {
-                            // מצא את הדוח הקיים ומיזג
-                            const existingIndex = reportsData.findIndex(r => r.family_name === newReport.family_name);
+                        const nf = fam(newReport);
+                        if (existingFamilyKeys.has(nf)) {
+                            const existingIndex = reportsData.findIndex(r => fam(r) === nf);
                             if (existingIndex !== -1) {
-                                // מיזוג הנתונים
-                                reportsData[existingIndex].raw_ins = [...(reportsData[existingIndex].raw_ins || []), ...(newReport.raw_ins || [])];
-                                reportsData[existingIndex].raw_fin = [...(reportsData[existingIndex].raw_fin || []), ...(newReport.raw_fin || [])];
-                                // עדכון members אם יש
-                                if (newReport.members) {
-                                    Object.assign(reportsData[existingIndex].members || {}, newReport.members);
-                                }
+                                const ex = reportsData[existingIndex];
+                                const rd = ex.raw_data || {};
+                                const nd = newReport.raw_data || {};
+                                rd.raw_ins = [...(rd.raw_ins || []), ...(nd.raw_ins || [])];
+                                rd.raw_fin = [...(rd.raw_fin || []), ...(nd.raw_fin || [])];
+                                rd.members = Object.assign({}, rd.members || {}, nd.members || {});
+                                ex.raw_data = rd;
+                                try {
+                                    const rr = await fetch('/render_report', {
+                                        method: 'POST',
+                                        credentials: 'include',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ raw_data: rd })
+                                    });
+                                    if (rr.ok) {
+                                        const j = await rr.json();
+                                        if (j.html) ex.html = j.html;
+                                    }
+                                } catch (e) { console.warn('render_report failed', e); }
                             }
                         } else {
-                            // דוח חדש - הוסף
                             reportsData.push(newReport);
                         }
                     }

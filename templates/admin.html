@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgencyOS - ניהול מערכת</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary: #ec4899; --primary-dark: #db2777; --secondary: #1e1b4b; --gray: #64748b; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Assistant', sans-serif; background: #f1f5f9; color: #1e293b; min-height: 100vh; }
+        .top-bar {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+            color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+        .top-bar a { color: white; text-decoration: none; padding: 8px 16px; border-radius: 8px; background: rgba(255,255,255,0.15); transition: 0.2s; }
+        .top-bar a:hover { background: rgba(255,255,255,0.25); }
+        .tabs { display: flex; gap: 8px; padding: 16px 24px; background: white; border-bottom: 1px solid #e2e8f0; }
+        .tab { padding: 12px 24px; border: none; background: #f1f5f9; border-radius: 10px; cursor: pointer; font-weight: 600; color: var(--gray); font-family: inherit; }
+        .tab:hover { background: #e2e8f0; color: var(--secondary); }
+        .tab.active { background: var(--primary); color: white; }
+        .panel { display: none; padding: 24px; max-width: 1000px; margin: 0 auto; }
+        .panel.active { display: block; }
+        .card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 16px; text-align: right; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; font-weight: 700; color: var(--secondary); }
+        tr:hover { background: #fafafa; }
+        .btn { border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; font-family: inherit; margin-left: 6px; transition: 0.2s; }
+        .btn-add { background: #10b981; color: white; }
+        .btn-add:hover { background: #059669; }
+        .btn-edit { background: #3b82f6; color: white; }
+        .btn-edit:hover { background: #2563eb; }
+        .btn-del { background: #ef4444; color: white; }
+        .btn-del:hover { background: #dc2626; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+        .filter-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .filter-row select, .filter-row input { padding: 10px 14px; border-radius: 8px; border: 2px solid #e2e8f0; font-family: inherit; }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: white; border-radius: 20px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        .modal h3 { margin: 0 0 20px; color: var(--secondary); }
+        .modal .input-group { margin-bottom: 16px; }
+        .modal .input-group label { display: block; margin-bottom: 6px; font-weight: 600; color: var(--gray); }
+        .modal .input-group input { width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-family: inherit; }
+        .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+        .modal-actions .btn { flex: 1; }
+        .empty-msg { text-align: center; padding: 48px 24px; color: var(--gray); }
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 14px 20px; border-radius: 10px; background: #1e293b; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 2000; display: none; }
+        .toast.show { display: block; animation: fadeIn 0.3s; }
+        .toast.err { background: #dc2626; }
+        .toast.ok { background: #10b981; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <span><i class="fas fa-cog"></i> ניהול מערכת</span>
+        <div style="display:flex; gap:10px;">
+            <a href="/"><i class="fas fa-home"></i> חזרה למערכת</a>
+            <a href="/logout"><i class="fas fa-sign-out-alt"></i> התנתקות</a>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button type="button" class="tab active" data-tab="users">ניהול משתמשים</button>
+        <button type="button" class="tab" data-tab="productions">הפקות אחרונות</button>
+    </div>
+
+    <div id="panel-users" class="panel active">
+        <div class="card">
+            <div class="toolbar">
+                <h2 style="margin:0;">משתמשים</h2>
+                <button type="button" class="btn btn-add" id="btnAddUser"><i class="fas fa-plus"></i> הוסף משתמש</button>
+            </div>
+            <div id="usersTableWrap">
+                <table>
+                    <thead><tr><th>שם משתמש</th><th>תפקיד</th><th>נוצר</th><th>פעולות</th></tr></thead>
+                    <tbody id="usersBody"></tbody>
+                </table>
+            </div>
+            <div id="usersEmpty" class="empty-msg" style="display:none;">אין משתמשים.</div>
+        </div>
+    </div>
+
+    <div id="panel-productions" class="panel">
+        <div class="card">
+            <div class="toolbar">
+                <h2 style="margin:0;">הפקות אחרונות</h2>
+                <div class="filter-row">
+                    <label>סינון לפי משתמש:</label>
+                    <select id="prodFilterUser">
+                        <option value="">הכל</option>
+                    </select>
+                    <label>מגבלה:</label>
+                    <select id="prodLimit">
+                        <option value="20">20</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
+                    <button type="button" class="btn btn-edit" id="btnRefreshProd"><i class="fas fa-sync"></i> רענן</button>
+                </div>
+            </div>
+            <div id="productionsTableWrap">
+                <table>
+                    <thead><tr><th>משתמש</th><th>תאריך</th><th>דוח</th><th>קבצים</th></tr></thead>
+                    <tbody id="productionsBody"></tbody>
+                </table>
+            </div>
+            <div id="productionsEmpty" class="empty-msg" style="display:none;">אין הפקות.</div>
+        </div>
+    </div>
+
+    <div id="modalUser" class="modal-overlay">
+        <div class="modal">
+            <h3 id="modalUserTitle">הוסף משתמש</h3>
+            <input type="hidden" id="modalUserId" value="">
+            <div class="input-group">
+                <label>שם משתמש</label>
+                <input type="text" id="modalUsername" placeholder="שם משתמש">
+            </div>
+            <div class="input-group">
+                <label>סיסמה</label>
+                <input type="password" id="modalPassword" placeholder="סיסמה">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-edit" id="modalUserSave">שמור</button>
+                <button type="button" class="btn" style="background:#e2e8f0; color:#475569;" id="modalUserCancel">ביטול</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        var users = [];
+        var productions = [];
+
+        function api(path, opts) {
+            opts = opts || {};
+            opts.credentials = 'include';
+            opts.headers = opts.headers || {};
+            if (opts.body && typeof opts.body === 'string' && !opts.headers['Content-Type'])
+                opts.headers['Content-Type'] = 'application/json';
+            return fetch(path, opts).then(function(r) {
+                var ct = r.headers.get('content-type');
+                if (ct && ct.indexOf('application/json') !== -1)
+                    return r.json().then(function(j) { return { ok: r.ok, status: r.status, json: j }; });
+                return { ok: r.ok, status: r.status, json: {} };
+            });
+        }
+
+        function toast(msg, isErr) {
+            var el = document.getElementById('toast');
+            el.textContent = msg;
+            el.className = 'toast show ' + (isErr ? 'err' : 'ok');
+            setTimeout(function() { el.classList.remove('show'); }, 3000);
+        }
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(function(t) { t.classList.toggle('active', t.dataset.tab === name); });
+            document.querySelectorAll('.panel').forEach(function(p) { p.classList.toggle('active', p.id === 'panel-' + name); });
+            if (name === 'users') loadUsers();
+            if (name === 'productions') loadProductions();
+        }
+
+        document.querySelectorAll('.tab').forEach(function(t) {
+            t.addEventListener('click', function() { switchTab(t.dataset.tab); });
+        });
+
+        function loadUsers() {
+            api('/admin/users').then(function(x) {
+                if (!x.ok) { toast(x.json && x.json.error ? x.json.error : 'שגיאה בטעינת משתמשים', true); return; }
+                users = x.json || [];
+                var tbody = document.getElementById('usersBody');
+                tbody.innerHTML = '';
+                var empty = document.getElementById('usersEmpty');
+                if (!users.length) { empty.style.display = 'block'; return; }
+                empty.style.display = 'none';
+                users.forEach(function(u) {
+                    var tr = document.createElement('tr');
+                    var isAdmin = u.username === 'ADMIN';
+                    tr.innerHTML =
+                        '<td>' + (u.username || '') + '</td>' +
+                        '<td>' + (u.role === 'admin' ? 'מנהל' : 'משתמש') + '</td>' +
+                        '<td>' + (u.created_at ? new Date(u.created_at).toLocaleString('he-IL') : '—') + '</td>' +
+                        '<td>' +
+                            (isAdmin ? '' : '<button type="button" class="btn btn-edit btn-edit-user" data-id="' + u.id + '" data-username="' + (u.username || '') + '">ערוך סיסמה</button>') +
+                            (isAdmin ? '' : ' <button type="button" class="btn btn-del btn-del-user" data-id="' + u.id + '" data-username="' + (u.username || '') + '">מחק</button>') +
+                        '</td>';
+                    tbody.appendChild(tr);
+                });
+                tbody.querySelectorAll('.btn-edit-user').forEach(function(b) {
+                    b.addEventListener('click', function() { openEditUser(b.dataset.id, b.dataset.username); });
+                });
+                tbody.querySelectorAll('.btn-del-user').forEach(function(b) {
+                    b.addEventListener('click', function() { deleteUser(b.dataset.id, b.dataset.username); });
+                });
+            });
+        }
+
+        function loadProductions() {
+            var user = document.getElementById('prodFilterUser').value;
+            var limit = document.getElementById('prodLimit').value;
+            var q = '/admin/productions?limit=' + limit;
+            if (user) q += '&user_id=' + encodeURIComponent(user);
+            api(q).then(function(x) {
+                if (!x.ok) { toast(x.json && x.json.error ? x.json.error : 'שגיאה בטעינת הפקות', true); return; }
+                productions = Array.isArray(x.json) ? x.json : [];
+                var tbody = document.getElementById('productionsBody');
+                tbody.innerHTML = '';
+                var empty = document.getElementById('productionsEmpty');
+                if (!productions.length) { empty.style.display = 'block'; document.getElementById('productionsTableWrap').style.display = 'none'; return; }
+                empty.style.display = 'none';
+                document.getElementById('productionsTableWrap').style.display = 'block';
+                productions.forEach(function(p) {
+                    var tr = document.createElement('tr');
+                    var ts = p.timestamp ? new Date(p.timestamp).toLocaleString('he-IL') : '—';
+                    tr.innerHTML = '<td>' + (p.username || '—') + '</td><td>' + ts + '</td><td>' + (p.family_name || 'כללי') + '</td><td>' + (p.file_count || 0) + '</td>';
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+
+        function fillProdFilterUsers() {
+            var sel = document.getElementById('prodFilterUser');
+            var cur = sel.value;
+            sel.innerHTML = '<option value="">הכל</option>';
+            users.forEach(function(u) {
+                if (u.username === 'ADMIN') return;
+                var o = document.createElement('option');
+                o.value = u.id;
+                o.textContent = u.username;
+                sel.appendChild(o);
+            });
+            sel.value = cur || '';
+        }
+
+        document.getElementById('btnAddUser').addEventListener('click', function() {
+            document.getElementById('modalUserTitle').textContent = 'הוסף משתמש';
+            document.getElementById('modalUserId').value = '';
+            document.getElementById('modalUsername').value = '';
+            document.getElementById('modalUsername').disabled = false;
+            document.getElementById('modalPassword').value = '';
+            document.getElementById('modalUser').classList.add('active');
+        });
+
+        function openEditUser(id, username) {
+            document.getElementById('modalUserTitle').textContent = 'עדכון סיסמה: ' + username;
+            document.getElementById('modalUserId').value = id;
+            document.getElementById('modalUsername').value = username;
+            document.getElementById('modalUsername').disabled = true;
+            document.getElementById('modalPassword').value = '';
+            document.getElementById('modalUser').classList.add('active');
+        }
+
+        document.getElementById('modalUserCancel').addEventListener('click', function() {
+            document.getElementById('modalUser').classList.remove('active');
+        });
+
+        document.getElementById('modalUser').addEventListener('click', function(e) {
+            if (e.target === this) document.getElementById('modalUser').classList.remove('active');
+        });
+
+        document.getElementById('modalUserSave').addEventListener('click', function() {
+            var id = document.getElementById('modalUserId').value;
+            var username = document.getElementById('modalUsername').value.trim();
+            var password = document.getElementById('modalPassword').value;
+            if (!username && !id) { toast('שם משתמש נדרש', true); return; }
+            if (!password) { toast('סיסמה נדרשת', true); return; }
+            if (id) {
+                api('/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ password: password }) })
+                    .then(function(x) {
+                        if (!x.ok) { toast(x.json && x.json.error ? x.json.error : 'שגיאה בעדכון', true); return; }
+                        toast('סיסמה עודכנה');
+                        document.getElementById('modalUser').classList.remove('active');
+                        loadUsers();
+                    });
+            } else {
+                api('/admin/users', { method: 'POST', body: JSON.stringify({ username: username, password: password }) })
+                    .then(function(x) {
+                        if (!x.ok) { toast(x.json && x.json.error ? x.json.error : 'שגיאה ביצירת משתמש', true); return; }
+                        toast('משתמש נוצר');
+                        document.getElementById('modalUser').classList.remove('active');
+                        loadUsers();
+                        fillProdFilterUsers();
+                    });
+            }
+        });
+
+        function deleteUser(id, username) {
+            if (!confirm('למחוק את המשתמש "' + username + '"?')) return;
+            api('/admin/users/' + id, { method: 'DELETE' }).then(function(x) {
+                if (!x.ok) { toast(x.json && x.json.error ? x.json.error : 'שגיאה במחיקה', true); return; }
+                toast('משתמש נמחק');
+                loadUsers();
+                fillProdFilterUsers();
+                loadProductions();
+            });
+        }
+
+        document.getElementById('btnRefreshProd').addEventListener('click', function() { loadProductions(); });
+        document.getElementById('prodFilterUser').addEventListener('change', function() { loadProductions(); });
+        document.getElementById('prodLimit').addEventListener('change', function() { loadProductions(); });
+
+        loadUsers().then(function() {
+            fillProdFilterUsers();
+            loadProductions();
+        });
+    </script>
+</body>
+</html>

@@ -66,7 +66,7 @@
 
     <div class="login-card">
         <div class="logo-area">
-            <img src="logo.png" onerror="this.style.display='none'; document.getElementById('defIcon').style.display='block'">
+            <img src="/logo.png" onerror="this.style.display='none'; document.getElementById('defIcon').style.display='block'">
             <i id="defIcon" class="fas fa-layer-group logo-icon" style="display:none"></i>
         </div>
 
@@ -76,15 +76,15 @@
         <form onsubmit="event.preventDefault(); tryLogin();">
             <div class="input-group">
                 <i class="fas fa-user"></i>
-                <input type="text" id="user" placeholder="שם משתמש" value="admin">
+                <input type="text" id="user" placeholder="שם משתמש" autocomplete="username">
             </div>
             <div class="input-group">
                 <i class="fas fa-lock"></i>
-                <input type="password" id="pass" placeholder="סיסמה" value="123456">
+                <input type="password" id="pass" placeholder="סיסמה" autocomplete="current-password">
             </div>
             
             <button type="submit" class="btn-login">כניסה למערכת</button>
-            <div id="errorMsg" class="error-msg"><i class="fas fa-exclamation-circle"></i> שם משתמש או סיסמה שגויים</div>
+            <div id="errorMsg" class="error-msg"><i class="fas fa-exclamation-circle"></i> <span id="errorText">שם משתמש או סיסמה שגויים</span></div>
         </form>
 
         <div class="footer">
@@ -94,19 +94,45 @@
 
     <script>
         function tryLogin() {
-            const u = document.getElementById('user').value;
+            const u = document.getElementById('user').value.trim();
             const p = document.getElementById('pass').value;
             const err = document.getElementById('errorMsg');
+            const errText = document.getElementById('errorText');
+            err.style.display = 'none';
 
-            if(u === 'admin' && p === '123456') {
-                // הצלחה - מעבר למערכת הראשית
-                // שומרים בזיכרון שהמשתמש מחובר
-                localStorage.setItem('agency_user', u);
-                window.location.href = '/dashboard'; 
-            } else {
+            if (!u || !p) {
+                errText.textContent = 'שם משתמש וסיסמה נדרשים';
                 err.style.display = 'block';
-                // רעידת הכרטיס לאפקט שגיאה
-                document.querySelector('.login-card').animate([
+                shake();
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append('username', u);
+            fd.append('password', p);
+
+            fetch('/login', { method: 'POST', body: fd, credentials: 'include' })
+                .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, status: r.status, json: j }; }); })
+                .then(function(x) {
+                    if (x.ok && x.json.success) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    errText.textContent = (x.json && x.json.error) ? x.json.error : 'שם משתמש או סיסמה שגויים';
+                    err.style.display = 'block';
+                    shake();
+                })
+                .catch(function() {
+                    errText.textContent = 'שגיאה בתקשורת. נסה שוב.';
+                    err.style.display = 'block';
+                    shake();
+                });
+        }
+
+        function shake() {
+            var card = document.querySelector('.login-card');
+            if (card && card.animate) {
+                card.animate([
                     { transform: 'translateX(0)' },
                     { transform: 'translateX(-10px)' },
                     { transform: 'translateX(10px)' },
