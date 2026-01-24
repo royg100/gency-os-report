@@ -4,371 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>מבט 360 - AgencyOS</title>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="agencyos.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <style>
-        :root {
-            --primary: #ec4899; --primary-dark: #db2777; --secondary: #2c3e50;
-            --bg: #f1f5f9; --white: #ffffff; --gray: #94a3b8; --success: #10b981;
-        }
-
-        body {
-            font-family: 'Assistant', sans-serif; background-color: var(--bg); color: var(--secondary);
-            margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;
-        }
-
-        /* מסך העלאה */
-        #uploadView { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; padding: 20px; }
-        .upload-container { background: var(--white); width: 100%; max-width: 600px; padding: 50px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; position: relative; }
-        .upload-admin-link { position: absolute; top: 20px; left: 20px; background: var(--secondary); color: white; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-        .upload-admin-link:hover { background: #1e293b; color: white; }
-        .logo { font-size: 3.5rem; color: var(--primary); margin-bottom: 15px; }
-        .upload-zone { border: 2px dashed #cbd5e1; border-radius: 16px; padding: 50px 20px; cursor: pointer; transition: all 0.3s ease; background: #fdfdfd; margin: 20px 0; }
-        .upload-zone:hover { border-color: var(--primary); background: #fdf2f8; transform: scale(1.01); }
-        .upload-zone.drag-over { border-color: var(--primary); background: #fdf2f8; transform: scale(1.02); box-shadow: 0 0 20px rgba(236, 72, 153, 0.2); }
-        .upload-icon { font-size: 3rem; color: #cbd5e1; margin-bottom: 15px; }
-        .generate-btn { background: var(--secondary); color: white; border: none; padding: 16px 30px; border-radius: 12px; font-size: 1.2rem; font-weight: 700; cursor: pointer; width: 100%; display: none; }
-        .generate-btn:hover { background: #1e293b; transform: translateY(-2px); }
-
-        /* מסך דשבורד */
-        #dashboardView { display: none; flex-direction: column; height: 100%; }
-        .top-bar { background: var(--secondary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .app-brand { font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
-        .top-actions { display: flex; gap: 10px; }
-        .top-actions button { background: rgba(255,255,255,0.1); border: none; color: white; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; display: flex; align-items: center; gap: 6px; }
-        .top-actions button:hover { background: rgba(255,255,255,0.2); }
-        .top-admin-link { background: rgba(255,255,255,0.1); border: none; color: white; padding: 8px 15px; border-radius: 6px; font-size: 0.9rem; transition: background 0.2s; display: flex; align-items: center; gap: 6px; text-decoration: none; }
-        .top-admin-link:hover { background: rgba(255,255,255,0.2); color: white; }
-        .btn-pdf { background: var(--success) !important; font-weight: 600; }
-        .btn-pdf:hover { background: #059669 !important; }
-        .btn-save-crm:hover { background: #059669 !important; }
-        .btn-print { background: var(--primary) !important; font-weight: 600; }
-        
-        .tabs-container { background: var(--white); padding: 0 20px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 5px; overflow-x: auto; }
-        .tab-btn { padding: 15px 25px; background: transparent; border: none; border-bottom: 3px solid transparent; font-weight: 600; color: var(--gray); cursor: pointer; white-space: nowrap; }
-        .tab-btn:hover { color: var(--primary); background: #f8fafc; }
-        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: #fff0f7; }
-        
-        /* דוח תובנות והמלצות טיפול */
-        .insights-report { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); direction: rtl; text-align: right; }
-        .insights-report .ir-header { text-align: center; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 3px solid #0284c7; }
-        .insights-report .ir-header i { font-size: 2.5rem; color: #0284c7; margin-bottom: 10px; display: block; }
-        .insights-report .ir-header h1 { margin: 0; font-size: 1.8rem; font-weight: 800; color: #0c4a6e; }
-        .insights-report .ir-meta { color: #64748b; margin-top: 10px; font-size: 1.05rem; }
-        .insights-report .ir-section { margin-bottom: 28px; }
-        .insights-report .ir-section h2 { font-size: 1.25rem; color: #0c4a6e; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #e0f2fe; }
-        .insights-report .ir-section ul { margin: 0; padding-right: 24px; line-height: 1.85; color: #334155; }
-        .insights-report .ir-sev { font-size: 0.8rem; padding: 2px 8px; border-radius: 6px; margin-right: 6px; }
-        .insights-report .ir-sev.sev-important { background: #fef3c7; color: #92400e; }
-        .insights-report .ir-sev.sev-review { background: #e0f2fe; color: #0369a1; }
-        .insights-report .ir-rec { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
-        .insights-report .ir-rec h3 { margin: 0 0 10px 0; font-size: 1.1rem; color: #0c4a6e; }
-        .insights-report .ir-rec-text { margin: 0 0 8px 0; color: #166534; line-height: 1.6; }
-        .insights-report .ir-rec-bg { margin: 0; color: #64748b; font-size: 0.9rem; }
-        .insights-report .ir-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 20px; }
-        .insights-report .ir-table th, .insights-report .ir-table td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
-        .insights-report .ir-table th { background: #f1f5f9; color: #1e293b; font-weight: 700; }
-        .insights-report .ir-appendix h3 { font-size: 1rem; margin: 16px 0 10px 0; color: #475569; }
-        .insights-report .ir-empty { text-align: center; padding: 50px 20px; color: #166534; }
-        .insights-report .ir-empty i { font-size: 4rem; margin-bottom: 20px; display: block; color: #10b981; }
-        .insights-report .ir-empty h2 { font-size: 1.5rem; margin-bottom: 12px; }
-        .insights-report .ir-empty p { color: #64748b; font-size: 1.05rem; }
-        
-        /* Toast Notifications */
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 10000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .toast {
-            background: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-width: 300px;
-            max-width: 400px;
-            animation: slideInLeft 0.3s ease;
-            border-right: 4px solid;
-        }
-        .toast.success { border-color: var(--success); }
-        .toast.error { border-color: #ef4444; }
-        .toast.info { border-color: #3b82f6; }
-        .toast.warning { border-color: #f59e0b; }
-        .toast i { font-size: 1.2rem; }
-        .toast.success i { color: var(--success); }
-        .toast.error i { color: #ef4444; }
-        .toast.info i { color: #3b82f6; }
-        .toast.warning i { color: #f59e0b; }
-        .toast-content { flex: 1; }
-        .toast-title { font-weight: 700; margin-bottom: 4px; }
-        .toast-message { font-size: 0.9rem; color: #64748b; }
-        @keyframes slideInLeft {
-            from { transform: translateX(-100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        
-        /* Progress Bar */
-        .progress-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 9999;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(4px);
-        }
-        .progress-overlay.active { display: flex; }
-        .progress-box {
-            background: white;
-            padding: 30px 40px;
-            border-radius: 16px;
-            min-width: 300px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        }
-        .progress-title {
-            font-weight: 700;
-            margin-bottom: 15px;
-            color: var(--secondary);
-        }
-        .progress-bar-container {
-            width: 100%;
-            height: 8px;
-            background: #e2e8f0;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-        .progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
-            width: 0%;
-            transition: width 0.3s ease;
-            border-radius: 4px;
-        }
-        .progress-text {
-            text-align: center;
-            font-size: 0.9rem;
-            color: #64748b;
-        }
-
-        .content-area { flex: 1; background: #e2e8f0; padding: 20px; overflow: hidden; position: relative; }
-        iframe { width: 100%; height: 100%; border: none; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .loader { width: 48px; height: 48px; border: 5px solid #FFF; border-bottom-color: var(--primary); border-radius: 50%; display: none; margin: 20px auto; animation: rotation 1s linear infinite; }
-        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Responsive design */
-        @media (max-width: 768px) {
-            .upload-container { padding: 30px 20px; }
-            .top-bar { flex-direction: column; gap: 10px; padding: 15px; }
-            .top-actions { flex-wrap: wrap; width: 100%; }
-            .top-actions button { flex: 1; min-width: 120px; font-size: 0.85rem; padding: 10px 12px; }
-            .tabs-container { padding: 0 10px; }
-            .tab-btn { padding: 12px 15px; font-size: 0.9rem; }
-            .content-area { padding: 10px; }
-        }
-        
-        /* Accessibility improvements */
-        button:focus-visible, .tab-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
-        .upload-zone:focus-within { border-color: var(--primary); }
-        
-        /* File List Styles */
-        .files-list-container { max-height: 300px; overflow-y: auto; margin: 20px 0; text-align: right; }
-        .file-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; margin-bottom: 8px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; transition: 0.3s; }
-        .file-item:hover { background: #fdf2f8; border-color: var(--primary); }
-        .file-info { flex: 1; display: flex; align-items: center; gap: 10px; }
-        .file-icon { color: var(--primary); font-size: 1.2rem; }
-        .file-details { flex: 1; }
-        .file-name { font-weight: 600; color: #1e293b; margin-bottom: 2px; }
-        .file-size { font-size: 0.85rem; color: #64748b; }
-        .file-remove-btn { background: #fee2e2; color: #dc2626; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: 0.3s; font-size: 0.9rem; }
-        .file-remove-btn:hover { background: #dc2626; color: white; }
-        .files-count { text-align: center; margin: 15px 0; padding: 10px; background: #fdf2f8; border-radius: 12px; color: var(--primary); font-weight: 600; }
-        .btn-clear-files { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; padding: 10px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.3s; margin-top: 10px; width: 100%; }
-        .btn-clear-files:hover { background: #fee2e2; color: #dc2626; border-color: #dc2626; }
-        .btn-clear-files:disabled { opacity: 0.5; cursor: not-allowed; }
-        
-        /* Modal styles - עיצוב משופר עם אנימציות */
-        .client-modal { 
-            display: none; 
-            position: fixed; 
-            z-index: 1000; 
-            left: 0; 
-            top: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: rgba(0, 0, 0, 0); 
-            overflow: auto; 
-            transition: background-color 0.3s ease;
-            backdrop-filter: blur(0px);
-            -webkit-backdrop-filter: blur(0px);
-        }
-        .client-modal.active { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-        }
-        .modal-content { 
-            background: white; 
-            border-radius: 20px; 
-            padding: 0; 
-            max-width: 900px; 
-            width: 90%; 
-            max-height: 90vh; 
-            overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); 
-            position: relative;
-            transform: scale(0.9) translateY(20px);
-            opacity: 0;
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
-        }
-        .client-modal.active .modal-content {
-            transform: scale(1) translateY(0);
-            opacity: 1;
-        }
-        .modal-header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            margin: 0; 
-            padding: 25px 30px; 
-            border-bottom: 2px solid #e2e8f0; 
-            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
-            border-radius: 20px 20px 0 0;
-        }
-        .modal-header h2 { 
-            margin: 0; 
-            color: var(--secondary); 
-            font-size: 1.5rem; 
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .modal-header h2::before {
-            content: '';
-            width: 4px;
-            height: 24px;
-            background: var(--primary);
-            border-radius: 2px;
-        }
-        .close-modal { 
-            background: #f1f5f9; 
-            border: none; 
-            font-size: 1.2rem; 
-            color: var(--gray); 
-            cursor: pointer; 
-            padding: 8px 12px; 
-            border-radius: 8px;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-        }
-        .close-modal:hover { 
-            background: var(--primary); 
-            color: white;
-            transform: rotate(90deg);
-        }
-        .client-products { 
-            padding: 30px; 
-            overflow-y: auto;
-            max-height: calc(90vh - 100px);
-        }
-        .product-section { 
-            margin-bottom: 35px; 
-        }
-        .product-section:last-child {
-            margin-bottom: 0;
-        }
-        .product-section h3 { 
-            color: var(--secondary); 
-            font-size: 1.3rem; 
-            margin-bottom: 20px; 
-            padding-bottom: 12px; 
-            border-bottom: 2px solid #e2e8f0; 
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .product-item { 
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); 
-            padding: 20px; 
-            border-radius: 12px; 
-            margin-bottom: 15px; 
-            border-right: 4px solid var(--primary);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-            transition: all 0.3s ease;
-        }
-        .product-item:hover {
-            transform: translateX(-4px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-        .product-item strong { 
-            color: var(--primary); 
-            display: block; 
-            margin-bottom: 12px; 
-            font-size: 1.1rem;
-            font-weight: 700;
-        }
-        .product-details { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
-            gap: 12px; 
-            font-size: 0.95rem; 
-            color: #64748b; 
-        }
-        .product-details span { 
-            display: flex; 
-            align-items: center; 
-            gap: 8px;
-            padding: 8px;
-            background: white;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-        }
-        .product-details span:hover {
-            background: #f1f5f9;
-            transform: translateY(-2px);
-        }
-        .product-details i {
-            color: var(--primary);
-            width: 18px;
-            text-align: center;
-        }
-        .clickable-client { 
-            cursor: pointer; 
-            color: var(--primary); 
-            text-decoration: none;
-            transition: all 0.2s ease;
-            padding: 2px 4px;
-            border-radius: 4px;
-        }
-        .clickable-client:hover { 
-            color: var(--primary-dark); 
-            background: #fdf2f8;
-            text-decoration: none;
-        }
-    </style>
 </head>
 <body>
 
@@ -773,20 +414,28 @@
             }
             const r = reportsData[0];
             const defaultName = (r.family || r.family_name || 'כללי').trim();
+            const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
             const swalResult = await Swal.fire({
                 title: 'שמור ל-CRM',
-                text: 'מה שם הלקוח לתצוגה?',
-                input: 'text',
-                inputValue: defaultName,
-                inputPlaceholder: 'שם המשפחה / הלקוח',
+                html: '<label style="display:block;text-align:right;margin-bottom:6px;font-weight:600;">שם לתצוגה</label>' +
+                    '<input id="swal-crm-name" class="swal2-input" value="' + esc(defaultName) + '" style="margin-bottom:12px;">' +
+                    '<label style="display:block;text-align:right;margin-bottom:6px;font-weight:600;">טלפון</label>' +
+                    '<input id="swal-crm-phone" class="swal2-input" type="tel" placeholder="למשל 050-1234567">',
                 showCancelButton: true,
                 confirmButtonText: 'שמור',
-                cancelButtonText: 'ביטול'
+                cancelButtonText: 'ביטול',
+                preConfirm: () => {
+                    const n = (document.getElementById('swal-crm-name').value || '').trim() || defaultName;
+                    const p = (document.getElementById('swal-crm-phone').value || '').trim();
+                    return { name: n, phone: p };
+                }
             });
             if (!swalResult.isConfirmed) return;
-            const familyName = (swalResult.value || '').trim() || defaultName;
+            const familyName = swalResult.value.name;
+            const phone = swalResult.value.phone || null;
             const payload = {
                 family_name: familyName,
+                phone: phone || undefined,
                 raw_data: r.raw_data || { raw_ins: [], raw_fin: [], members: {} },
                 html: r.html || '',
                 insights_report: r.insights_report || {}

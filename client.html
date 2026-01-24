@@ -6,176 +6,13 @@
     <title>AgencyOS - מערכת ניהול סוכנות</title>
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="agencyos.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-
-    <style>
-        :root {
-            --primary: #4f46e5;
-            --accent: #f72585; /* ורוד פוקסיה */
-            --bg: #f8fafc;
-            --sidebar-w: 260px;
-            --card-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-        }
-
-        body { background: var(--bg); font-family: 'Heebo', sans-serif; height: 100vh; overflow: hidden; margin: 0; }
-
-        /* Login */
-        #loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .login-card { background: rgba(255,255,255,0.95); padding: 50px; border-radius: 24px; width: 400px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
-        .btn-pink { background: var(--accent); color: white; border: none; padding: 12px; width: 100%; border-radius: 50px; font-weight: bold; font-size: 1.1rem; margin-top: 20px; transition: 0.3s; box-shadow: 0 4px 15px rgba(247, 37, 133, 0.4); }
-        .btn-pink:hover { background: #b5179e; transform: translateY(-2px); }
-
-        /* Layout */
-        #appLayout { display: none; height: 100vh; display: flex; }
-        .sidebar { width: var(--sidebar-w); background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; padding: 25px; min-width: 260px; z-index: 100; box-shadow: 5px 0 15px rgba(0,0,0,0.02); }
-        .content { flex: 1; padding: 30px; overflow-y: auto; background: #f1f5f9; position: relative; }
-        
-        .nav-item { padding: 14px; margin-bottom: 8px; cursor: pointer; border-radius: 12px; color: #64748b; display: flex; gap: 12px; align-items: center; font-weight: 500; transition: 0.2s; }
-        .nav-item:hover, .nav-item.active { background: #eef2ff; color: var(--primary); }
-        .nav-item i { width: 24px; text-align: center; font-size: 1.2rem; }
-
-        /* Cards */
-        .card-box { background: white; border-radius: 20px; padding: 25px; box-shadow: var(--card-shadow); margin-bottom: 20px; border: 1px solid #f1f5f9; transition: 0.3s; }
-        .card-box:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-        
-        .stat-val { font-size: 2rem; font-weight: 800; color: #1e293b; }
-        .stat-label { font-size: 0.85rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-
-        /* Family Card */
-        .family-card { cursor: pointer; border-right: 4px solid transparent; }
-        .family-card:hover { border-right-color: var(--primary); }
-
-        /* Modal (Upload Popup) */
-        .modal-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000;
-            display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px);
-        }
-        .modal-content {
-            background: white; width: 600px; padding: 40px; border-radius: 24px; text-align: center; position: relative;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
-        }
-        .drop-zone {
-            border: 3px dashed #cbd5e1; border-radius: 20px; padding: 50px; margin: 20px 0;
-            cursor: pointer; transition: 0.3s; background: #f8fafc;
-        }
-        .drop-zone:hover { border-color: var(--primary); background: #eff6ff; }
-        .close-btn { position: absolute; top: 20px; right: 20px; cursor: pointer; font-size: 1.5rem; color: #94a3b8; }
-        .close-btn:hover { color: #1e293b; }
-
-        /* Participants Modal */
-        .participants-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2001; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .participants-modal.active { display: flex; }
-        .participants-content { background: white; width: 500px; max-width: 90vw; max-height: 80vh; padding: 30px; border-radius: 24px; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow-y: auto; }
-        .participants-list { margin-top: 20px; }
-        .participant-item { padding: 15px; margin-bottom: 10px; border-radius: 12px; border: 2px solid #e2e8f0; transition: 0.3s; display: flex; align-items: center; justify-content: space-between; }
-        .participant-item:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .participant-item.has-coverage { background: #dcfce7; border-color: #10b981; color: #166534; }
-        .participant-name { font-weight: 600; font-size: 1.1rem; }
-        .participant-status { display: flex; align-items: center; gap: 8px; }
-        .coverage-badge { background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
-        .no-coverage-badge { background: #f1f5f9; color: #64748b; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; }
-        .cube-icon { cursor: pointer; padding: 8px; border-radius: 8px; transition: 0.3s; color: #64748b; }
-        .cube-icon:hover { background: #eef2ff; color: var(--primary); transform: rotate(90deg); }
-
-        /* File List Styles */
-        .files-list-container { max-height: 300px; overflow-y: auto; margin: 20px 0; text-align: right; }
-        .file-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; margin-bottom: 8px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; transition: 0.3s; }
-        .file-item:hover { background: #eff6ff; border-color: var(--primary); }
-        .file-info { flex: 1; display: flex; align-items: center; gap: 10px; }
-        .file-icon { color: var(--primary); font-size: 1.2rem; }
-        .file-details { flex: 1; }
-        .file-name { font-weight: 600; color: #1e293b; margin-bottom: 2px; }
-        .file-size { font-size: 0.85rem; color: #64748b; }
-        .file-remove-btn { background: #fee2e2; color: #dc2626; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: 0.3s; font-size: 0.9rem; }
-        .file-remove-btn:hover { background: #dc2626; color: white; }
-        .files-count { text-align: center; margin: 15px 0; padding: 10px; background: #eef2ff; border-radius: 12px; color: var(--primary); font-weight: 600; }
-        .modal-actions { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
-        .btn-process { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 50px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .btn-process:hover { background: #4338ca; transform: translateY(-2px); }
-        .btn-process:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; }
-        .btn-clear { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; padding: 12px 30px; border-radius: 50px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .btn-clear:hover { background: #fee2e2; color: #dc2626; border-color: #dc2626; }
-        .btn-clear:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        /* Tables */
-        .styled-table { width: 100%; border-collapse: collapse; }
-        .styled-table th { background: #f8fafc; padding: 15px; text-align: right; color: #475569; border-bottom: 2px solid #e2e8f0; }
-        .styled-table td { padding: 15px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-        .styled-table tr:hover { background: #f8fafc; }
-
-        /* Print */
-        @media print {
-            body { background: white; }
-            #sidebar, #loginScreen, .no-print, .btn, .modal-overlay { display: none !important; }
-            #clientView { display: block !important; position: absolute; top: 0; left: 0; width: 100%; z-index: 5000; background: white; }
-            .card-box { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
-            .pdf-cover { 
-                height: 100vh; display: flex !important; flex-direction: column; justify-content: center; align-items: center; text-align: center;
-                background: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%); page-break-after: always;
-            }
-        }
-        .pdf-cover { display: none; }
-
-        /* view-360 (מבט 360) */
-        #view-360 { display: none; flex-direction: column; height: 100%; min-height: 0; }
-        .v360-upload { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
-        .v360-upload-box { background: white; max-width: 560px; width: 100%; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; }
-        .v360-upload-zone { border: 2px dashed #cbd5e1; border-radius: 16px; padding: 40px 20px; cursor: pointer; transition: 0.3s; background: #fdfdfd; margin: 16px 0; }
-        .v360-upload-zone:hover { border-color: var(--primary); background: #fdf2f8; }
-        .v360-generate { background: var(--primary); color: white; border: none; padding: 14px 28px; border-radius: 12px; font-weight: 700; cursor: pointer; margin-top: 12px; display: none; }
-        .v360-generate:hover { background: #b5179e; }
-        .v360-files-list { max-height: 220px; overflow-y: auto; margin: 12px 0; text-align: right; }
-        .v360-file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; margin-bottom: 6px; background: #f8fafc; border-radius: 10px; font-size: 0.9rem; }
-        .v360-dashboard { display: none; flex-direction: column; flex: 1; min-height: 0; background: #f1f5f9; }
-        .v360-bar { background: #1e1b4b; color: white; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-        .v360-bar button { background: rgba(255,255,255,0.15); border: none; color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
-        .v360-bar button:hover { background: rgba(255,255,255,0.25); }
-        .v360-bar .btn-save-crm { background: #10b981 !important; font-weight: 600; }
-        .v360-bar .btn-save-crm:hover { background: #059669 !important; }
-        .v360-tabs { background: white; padding: 0 16px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 4px; overflow-x: auto; }
-        .v360-tab { padding: 12px 20px; background: transparent; border: none; border-bottom: 3px solid transparent; font-weight: 600; color: #94a3b8; cursor: pointer; white-space: nowrap; }
-        .v360-tab:hover { color: var(--primary); }
-        .v360-tab.active { color: var(--primary); border-bottom-color: var(--primary); background: #fff0f7; }
-        .v360-content { flex: 1; background: #e2e8f0; padding: 16px; overflow: hidden; position: relative; }
-        .v360-content iframe { width: 100%; height: 100%; border: none; background: white; border-radius: 8px; }
-        .v360-recommendations { padding: 20px; overflow-y: auto; height: 100%; background: #f1f5f9; }
-        .v360-loader { width: 48px; height: 48px; border: 4px solid #e2e8f0; border-bottom-color: var(--primary); border-radius: 50%; animation: v360-spin 1s linear infinite; margin: 20px auto; display: none; }
-        @keyframes v360-spin { to { transform: rotate(360deg); } }
-        .v360-toast { position: fixed; top: 20px; left: 20px; z-index: 10000; background: white; padding: 14px 18px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; border-right: 4px solid #10b981; animation: v360-toast-in 0.3s ease; }
-        .v360-toast.err { border-color: #ef4444; }
-        @keyframes v360-toast-in { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .v360-progress { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: none; align-items: center; justify-content: center; }
-        .v360-progress.active { display: flex; }
-        .v360-progress-box { background: white; padding: 24px 32px; border-radius: 16px; min-width: 280px; }
-        .v360-client-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2002; align-items: center; justify-content: center; }
-        .v360-client-modal.active { display: flex; }
-        .v360-client-modal .modal-inner { background: white; border-radius: 20px; max-width: 640px; width: 90%; max-height: 85vh; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
-        .v360-client-modal .modal-header { padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-        .v360-client-modal .modal-body { padding: 20px; overflow-y: auto; max-height: 60vh; }
-        .insights-report { max-width: 900px; margin: 0 auto; direction: rtl; text-align: right; }
-        .insights-report .ir-header { text-align: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 3px solid #0284c7; }
-        .insights-report .ir-section { margin-bottom: 20px; }
-        .insights-report .ir-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 16px; }
-        .insights-report .ir-table th, .insights-report .ir-table td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
-        .insights-report .ir-table th { background: #f1f5f9; font-weight: 700; }
-        .crm-edit-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2100; align-items: center; justify-content: center; }
-        .crm-edit-modal.active { display: flex; }
-        .crm-edit-modal .modal-inner { background: white; border-radius: 20px; max-width: 900px; width: 95%; max-height: 90vh; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.25); display: flex; flex-direction: column; }
-        .crm-edit-modal .modal-header { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-        .crm-edit-modal .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
-        .crm-edit-modal .editable-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 20px; }
-        .crm-edit-modal .editable-table th, .crm-edit-modal .editable-table td { border: 1px solid #e2e8f0; padding: 8px; text-align: right; }
-        .crm-edit-modal .editable-table th { background: #f1f5f9; font-weight: 700; }
-        .crm-edit-modal .editable-table input { width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px; }
-        .crm-edit-modal .editable-table .col-actions { width: 40px; }
-        .crm-edit-modal .sec-title { font-weight: 700; color: #1e293b; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--primary); }
-        .crm-edit-modal .sec-title:first-child { margin-top: 0; }
-    </style>
 </head>
 <body>
 
@@ -213,7 +50,7 @@
             </div>
             
             <div style="margin-top: auto;">
-                <a href="/admin" class="nav-item" id="navAdmin" style="display: none; text-decoration: none; color: inherit;"><i class="fas fa-cog"></i> ניהול</a>
+                <a href="/admin" class="nav-item" id="navAdmin" style="display: none; text-decoration: none;"><i class="fas fa-cog"></i> ניהול</a>
                 <a href="/logout" class="nav-item text-danger" style="text-decoration: none; color: #dc2626;">
                     <i class="fas fa-sign-out-alt"></i> יציאה
                 </a>
@@ -776,19 +613,26 @@
             if (!v360ReportsData.length) { v360Toast('אין דשבורד לשמירה', true); return; }
             var r = v360ReportsData[0];
             var defaultName = (r.family || r.family_name || 'כללי').trim();
+            var esc = function(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
             var swalResult = await Swal.fire({
                 title: 'שמור ל-CRM',
-                text: 'מה שם הלקוח לתצוגה?',
-                input: 'text',
-                inputValue: defaultName,
-                inputPlaceholder: 'שם המשפחה / הלקוח',
+                html: '<label style="display:block;text-align:right;margin-bottom:6px;font-weight:600;">שם לתצוגה</label>' +
+                    '<input id="swal-crm-name" class="swal2-input" value="' + esc(defaultName) + '" style="margin-bottom:12px;">' +
+                    '<label style="display:block;text-align:right;margin-bottom:6px;font-weight:600;">טלפון</label>' +
+                    '<input id="swal-crm-phone" class="swal2-input" type="tel" placeholder="למשל 050-1234567">',
                 showCancelButton: true,
                 confirmButtonText: 'שמור',
-                cancelButtonText: 'ביטול'
+                cancelButtonText: 'ביטול',
+                preConfirm: function() {
+                    var n = (document.getElementById('swal-crm-name').value || '').trim() || defaultName;
+                    var p = (document.getElementById('swal-crm-phone').value || '').trim();
+                    return { name: n, phone: p };
+                }
             });
             if (!swalResult.isConfirmed) return;
-            var familyName = (swalResult.value || '').trim() || defaultName;
-            var payload = { family_name: familyName, raw_data: r.raw_data || { raw_ins: [], raw_fin: [], members: {} }, html: r.html || '', insights_report: r.insights_report || {} };
+            var familyName = swalResult.value.name;
+            var phone = swalResult.value.phone || null;
+            var payload = { family_name: familyName, phone: phone || undefined, raw_data: r.raw_data || { raw_ins: [], raw_fin: [], members: {} }, html: r.html || '', insights_report: r.insights_report || {} };
             try {
                 var res = await fetch('/api/dashboards', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 if (res.status === 401) { window.location.href = '/login'; return; }
@@ -1258,6 +1102,7 @@
             var memRows = memArr.map(function(row, i) { return memRow(i, row); }).join('');
             body.innerHTML =
                 '<div class="mb-3"><label class="form-label fw-bold">שם משפחה / לקוח</label><input type="text" class="form-control" id="crmEditFamilyName" value="' + esc(d.family_name || 'כללי') + '"></div>' +
+                '<div class="mb-3"><label class="form-label fw-bold">טלפון</label><input type="tel" class="form-control" id="crmEditPhone" value="' + esc(d.phone || '') + '" placeholder="למשל 050-1234567"></div>' +
                 '<div class="sec-title">תיק ביטוחי</div>' +
                 '<table class="editable-table" id="crmEditIns"><thead><tr>' + insHeaders + '<th class="col-actions"></th></tr></thead><tbody>' + insRows + '</tbody></table>' +
                 '<button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="crmEditAddRow(\'ins\')"><i class="fas fa-plus me-1"></i> הוסף שורה</button>' +
@@ -1300,6 +1145,7 @@
         }
         function collectCrmEditData() {
             var family = (document.getElementById('crmEditFamilyName') && document.getElementById('crmEditFamilyName').value || 'כללי').trim();
+            var phone = (document.getElementById('crmEditPhone') && document.getElementById('crmEditPhone').value || '').trim() || null;
             var raw_ins = [];
             var raw_fin = [];
             var members = {};
@@ -1332,17 +1178,19 @@
                 var n = (m.name || '').trim();
                 if (n) members[n] = { age: m.age || '', job: m.job || '', status: m.status || '' };
             });
-            return { family_name: family, raw_data: { raw_ins: raw_ins, raw_fin: raw_fin, members: members } };
+            return { family_name: family, phone: phone, raw_data: { raw_ins: raw_ins, raw_fin: raw_fin, members: members } };
         }
         async function saveCrmEdit() {
             if (!_crmEditDashboardId) return;
             var payload = collectCrmEditData();
+            var putBody = { family_name: payload.family_name, raw_data: payload.raw_data };
+            if (payload.phone !== undefined) putBody.phone = payload.phone;
             try {
                 var r = await fetch('/api/dashboards/' + encodeURIComponent(_crmEditDashboardId), {
                     method: 'PUT',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ family_name: payload.family_name, raw_data: payload.raw_data })
+                    body: JSON.stringify(putBody)
                 });
                 if (r.status === 401) { window.location.href = '/login'; return; }
                 if (!r.ok) { var j = await r.json().catch(function() { return {}; }); Swal.fire('שגיאה', j.error || 'עדכון נכשל', 'error'); return; }
@@ -1413,7 +1261,8 @@
 
             savedDashboards.filter(function(d) {
                 var fn = (d.family_name || 'כללי').trim();
-                return fn.toLowerCase().indexOf(q) >= 0;
+                var ph = (d.phone || '').trim();
+                return fn.toLowerCase().indexOf(q) >= 0 || (ph && ph.toLowerCase().indexOf(q) >= 0);
             }).forEach(function(d) {
                 var fn = (d.family_name || 'כללי').trim();
                 var id = d.id || '';
@@ -1422,11 +1271,14 @@
                 var div = document.createElement('div');
                 div.className = 'col-md-4';
                 var escId = (d.id || '').replace(/'/g, "\\'");
+                var ph = (d.phone || '').trim();
+                var phEsc = ph ? ph.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : '';
                 div.innerHTML = '<div class="card-box family-card border-primary border-2">' +
                     '<span class="badge bg-primary mb-2">נשמר מ-360</span> ' +
                     '<code class="small text-muted" title="מפתח CRM">' + crmKey + '</code>' +
                     '<h4 class="fw-bold m-0 text-primary mt-2">' + fn + '</h4>' +
                     '<p class="text-muted small mb-2">' + dat + '</p>' +
+                    (ph ? '<p class="text-muted small mb-2"><i class="fas fa-phone me-1"></i>' + phEsc + '</p>' : '') +
                     '<div class="d-flex flex-wrap gap-2 mt-3">' +
                     '<button type="button" class="btn btn-sm btn-primary" onclick="openDashboard360(\'' + escId + '\')"><i class="fas fa-chart-line me-1"></i> פתח דשבורד</button>' +
                     '<button type="button" class="btn btn-sm btn-outline-primary" onclick="openDashboardAsClientById(\'' + escId + '\')"><i class="fas fa-user me-1"></i> פתח כלקוח</button>' +

@@ -4,70 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AgencyOS - ניהול מערכת</title>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root { --primary: #ec4899; --primary-dark: #db2777; --secondary: #1e1b4b; --gray: #64748b; }
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'Assistant', sans-serif; background: #f1f5f9; color: #1e293b; min-height: 100vh; }
-        .top-bar {
-            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
-            color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-        }
-        .top-bar a { color: white; text-decoration: none; padding: 8px 16px; border-radius: 8px; background: rgba(255,255,255,0.15); transition: 0.2s; }
-        .top-bar a:hover { background: rgba(255,255,255,0.25); }
-        .tabs { display: flex; gap: 8px; padding: 16px 24px; background: white; border-bottom: 1px solid #e2e8f0; }
-        .tab { padding: 12px 24px; border: none; background: #f1f5f9; border-radius: 10px; cursor: pointer; font-weight: 600; color: var(--gray); font-family: inherit; }
-        .tab:hover { background: #e2e8f0; color: var(--secondary); }
-        .tab.active { background: var(--primary); color: white; }
-        .panel { display: none; padding: 24px; max-width: 1000px; margin: 0 auto; }
-        .panel.active { display: block; }
-        #panel-productions { max-width: 1200px; }
-        .card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); margin-bottom: 24px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px 16px; text-align: right; border-bottom: 1px solid #e2e8f0; }
-        th { background: #f8fafc; font-weight: 700; color: var(--secondary); }
-        tr:hover { background: #fafafa; }
-        .btn { border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; font-family: inherit; margin-left: 6px; transition: 0.2s; }
-        .btn-add { background: #10b981; color: white; }
-        .btn-add:hover { background: #059669; }
-        .btn-edit { background: #3b82f6; color: white; }
-        .btn-edit:hover { background: #2563eb; }
-        .btn-del { background: #ef4444; color: white; }
-        .btn-del:hover { background: #dc2626; }
-        .btn-perms { background: #8b5cf6; color: white; }
-        .btn-perms:hover { background: #7c3aed; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
-        .filter-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        .filter-row select, .filter-row input { padding: 10px 14px; border-radius: 8px; border: 2px solid #e2e8f0; font-family: inherit; }
-        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
-        .modal-overlay.active { display: flex; }
-        .modal { background: white; border-radius: 20px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
-        .modal h3 { margin: 0 0 20px; color: var(--secondary); }
-        .modal .input-group { margin-bottom: 16px; }
-        .modal .input-group label { display: block; margin-bottom: 6px; font-weight: 600; color: var(--gray); }
-        .modal .input-group input { width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-family: inherit; }
-        .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
-        .modal-actions .btn { flex: 1; }
-        .empty-msg { text-align: center; padding: 48px 24px; color: var(--gray); }
-        .toast { position: fixed; bottom: 24px; right: 24px; padding: 14px 20px; border-radius: 10px; background: #1e293b; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 2000; display: none; }
-        .toast.show { display: block; animation: fadeIn 0.3s; }
-        .toast.err { background: #dc2626; }
-        .toast.ok { background: #10b981; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .file-names-wrap { max-width: 320px; max-height: 120px; overflow-y: auto; overflow-x: hidden; font-size: 0.85rem; color: var(--gray); }
-        .file-names-wrap::-webkit-scrollbar { width: 6px; }
-        .file-names-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
-        .file-names-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        .file-name-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .file-name-item:last-child { border-bottom: none; }
-        .file-name-item i { color: var(--primary); flex-shrink: 0; }
-        .permission-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
-        .permission-item:last-child { border-bottom: none; }
-        .permission-item input[type="checkbox"] { width: 18px; height: 18px; }
-    </style>
+    <link rel="stylesheet" href="/agencyos.css">
 </head>
 <body>
     <div class="top-bar">

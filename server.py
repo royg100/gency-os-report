@@ -242,7 +242,21 @@ def api_delete_dashboard(dashboard_id):
         _save_dashboards_json(data)
     return True
 
-def api_update_dashboard(dashboard_id, family_name=None, raw_data=None):
+def _update_client_by_id(client_id, name=None, phone=None):
+    with _CLIENTS_LOCK:
+        clients = _load_clients_json()
+        for c in clients:
+            if c.get('id') != client_id:
+                continue
+            if name is not None:
+                c['name'] = name.strip()
+            if phone is not None:
+                c['phone'] = (phone or '').strip() or None
+            _save_clients_json(clients)
+            return True
+    return False
+
+def api_update_dashboard(dashboard_id, family_name=None, raw_data=None, phone=None):
     with _DASHBOARDS_LOCK:
         data = _load_dashboards_json()
         for d in data:
@@ -252,6 +266,8 @@ def api_update_dashboard(dashboard_id, family_name=None, raw_data=None):
                 d['crm_key'] = _next_crm_key(data)
             if family_name is not None:
                 d['family_name'] = family_name.strip()
+            if phone is not None:
+                d['phone'] = (phone or '').strip() or None
             if raw_data is not None:
                 r = (d.get('reports') or [{}])[0]
                 if not isinstance(r, dict):
@@ -266,10 +282,13 @@ def api_update_dashboard(dashboard_id, family_name=None, raw_data=None):
                     d['reports'] = []
                 d['reports'][0] = r
             _save_dashboards_json(data)
+            cid = d.get('client_id')
+            if cid and (family_name is not None or phone is not None):
+                _update_client_by_id(cid, name=family_name if family_name is not None else None, phone=phone)
             return True
     return False
 
-def api_create_dashboard(family_name, raw_data, html, insights_report, created_by, file_names=None):
+def api_create_dashboard(family_name, raw_data, html, insights_report, created_by, file_names=None, phone=None):
     raw_data = raw_data or {}
     raw_ins = raw_data.get('raw_ins') or []
     raw_fin = raw_data.get('raw_fin') or []
@@ -306,6 +325,7 @@ def api_create_dashboard(family_name, raw_data, html, insights_report, created_b
             'created_at': datetime.utcnow().isoformat(),
             'created_by': str(created_by),
             'family_name': family_name,
+            'phone': (phone or '').strip() or None,
             'reports': [report],
             'file_names': file_names or []
         })
@@ -2471,6 +2491,7 @@ def api_dashboards_create():
         return jsonify({"error": "אין הרשאה לשמירה ל-CRM"}), 403
     body = request.get_json(silent=True) or {}
     family_name = (body.get('family_name') or body.get('family') or 'כללי').strip()
+    phone = (body.get('phone') or '').strip() or None
     raw_data = body.get('raw_data') or {}
     raw_data = {
         'raw_ins': raw_data.get('raw_ins') or [],
@@ -2482,7 +2503,7 @@ def api_dashboards_create():
     file_names = body.get('file_names') or []
     if not family_name:
         return jsonify({"error": "family_name נדרש"}), 400
-    dash, err = api_create_dashboard(family_name, raw_data, html, insights_report, current_user.id, file_names)
+    dash, err = api_create_dashboard(family_name, raw_data, html, insights_report, current_user.id, file_names, phone=phone)
     if err:
         return jsonify({"error": err}), 400
     return jsonify(dash), 201
@@ -2520,9 +2541,10 @@ def api_dashboards_update(dashboard_id):
     body = request.get_json(silent=True) or {}
     family_name = body.get('family_name')
     raw_data = body.get('raw_data')
-    if not family_name and not raw_data:
-        return jsonify({"error": "נדרש family_name או raw_data לעדכון"}), 400
-    if not api_update_dashboard(dashboard_id, family_name=family_name, raw_data=raw_data):
+    phone = body.get('phone') if 'phone' in body else None
+    if family_name is None and raw_data is None and 'phone' not in body:
+        return jsonify({"error": "נדרש family_name, raw_data או phone לעדכון"}), 400
+    if not api_update_dashboard(dashboard_id, family_name=family_name, raw_data=raw_data, phone=phone):
         return jsonify({"error": "דשבורד לא נמצא"}), 404
     d = api_get_dashboard(dashboard_id)
     return jsonify(d)
