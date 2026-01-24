@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 from io import BytesIO
 from werkzeug.utils import secure_filename
 from pathlib import Path
+import threading
 
 # הגדרת האפליקציה
 app = Flask(__name__, static_folder='.')
@@ -43,10 +44,20 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# --- סשנים פעילים (מחוברים כעת) ---
+ACTIVE_SESSIONS = {}
+_SESSIONS_LOCK = threading.Lock()
+DEFAULT_PERMISSIONS = ['view_dashboards', 'upload', 'save_crm', 'delete']
+ALL_PERMISSIONS = ['view_dashboards', 'upload', 'save_crm', 'delete', 'admin']
+
 # --- אחסון משתמשים והפקות (data/users.json, data/productions.json) ---
 DATA_DIR = Path(__file__).resolve().parent / 'data'
 USERS_PATH = DATA_DIR / 'users.json'
 PRODUCTIONS_PATH = DATA_DIR / 'productions.json'
+DASHBOARDS_PATH = DATA_DIR / 'dashboards.json'
+CLIENTS_PATH = DATA_DIR / 'clients.json'
+_DASHBOARDS_LOCK = threading.Lock()
+_CLIENTS_LOCK = threading.Lock()
 
 # ADMIN קבוע: שם ADMIN, סיסמה R!2345i
 ADMIN_USERNAME = 'ADMIN'
@@ -66,13 +77,14 @@ def _save_users_json(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def get_users_dict():
-    """מחזיר dict: username -> {password_hash, id, role, created_at}. כולל ADMIN."""
+    """מחזיר dict: username -> {password_hash, id, role, created_at, permissions}. כולל ADMIN."""
     out = {
         ADMIN_USERNAME: {
             'password_hash': ADMIN_PASSWORD_HASH,
             'id': ADMIN_ID,
             'role': 'admin',
-            'created_at': None
+            'created_at': None,
+            'permissions': list(ALL_PERMISSIONS)
         }
     }
     for u in _load_users_json():
@@ -80,7 +92,8 @@ def get_users_dict():
             'password_hash': u['password_hash'],
             'id': str(u['id']),
             'role': u.get('role', 'user'),
-            'created_at': u.get('created_at')
+            'created_at': u.get('created_at'),
+            'permissions': u.get('permissions') if isinstance(u.get('permissions'), list) else list(DEFAULT_PERMISSIONS)
         }
     return out
 
@@ -108,6 +121,17 @@ def update_user_password(user_id, new_password):
     for u in users:
         if str(u['id']) == str(user_id):
             u['password_hash'] = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            _save_users_json(users)
+            return True
+    return False
+
+def update_user_permissions(user_id, permissions):
+    if str(user_id) == ADMIN_ID:
+        return False
+    users = _load_users_json()
+    for u in users:
+        if str(u['id']) == str(user_id):
+            u['permissions'] = [p for p in permissions if p in ALL_PERMISSIONS]
             _save_users_json(users)
             return True
     return False
@@ -149,6 +173,144 @@ def get_productions(user_id=None, limit=50):
         data = [p for p in data if p.get('user_id') == str(user_id)]
     data = sorted(data, key=lambda p: p.get('timestamp', ''), reverse=True)
     return data[:limit]
+
+# --- dashboards + clients (MENU_CRM) ---
+def _load_dashboards_json():
+    try:
+        with open(DASHBOARDS_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+def _save_dashboards_json(data):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(DASHBOARDS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def _load_clients_json():
+    try:
+        with open(CLIENTS_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+def _save_clients_json(data):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CLIENTS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def _next_id(store, prefix):
+    today = datetime.utcnow().strftime('%Y%m%d')
+    p = prefix + today + '-'
+    same = [x for x in store if (x.get('id') or '').startswith(p)]
+    return p + str(len(same) + 1).zfill(3)
+
+def _next_crm_key(store=None):
+    """מפתח CRM: 9 ספרות בלבד (למשל 000000001), ייחודי."""
+    data = store if store is not None else _load_dashboards_json()
+    existing = []
+    for x in data:
+        k = (x.get('crm_key') or '').strip()
+        dig = ''.join(c for c in k if c.isdigit())
+        if len(dig) == 9 and dig.isdigit():
+            existing.append(int(dig))
+    nxt = (max(existing, default=0) + 1)
+    if nxt > 999999999:
+        raise ValueError('CRM_KEY overflow')
+    return str(nxt).zfill(9)
+
+def api_list_dashboards(created_by=None):
+    data = _load_dashboards_json()
+    if created_by is not None:
+        data = [d for d in data if d.get('created_by') == str(created_by)]
+    return sorted(data, key=lambda d: d.get('created_at', ''), reverse=True)
+
+def api_get_dashboard(dashboard_id):
+    data = _load_dashboards_json()
+    for d in data:
+        if d.get('id') == dashboard_id:
+            return d
+    return None
+
+def api_delete_dashboard(dashboard_id):
+    with _DASHBOARDS_LOCK:
+        data = _load_dashboards_json()
+        prev = len(data)
+        data = [d for d in data if d.get('id') != dashboard_id]
+        if len(data) == prev:
+            return False
+        _save_dashboards_json(data)
+    return True
+
+def api_update_dashboard(dashboard_id, family_name=None, raw_data=None):
+    with _DASHBOARDS_LOCK:
+        data = _load_dashboards_json()
+        for d in data:
+            if d.get('id') != dashboard_id:
+                continue
+            if not d.get('crm_key'):
+                d['crm_key'] = _next_crm_key(data)
+            if family_name is not None:
+                d['family_name'] = family_name.strip()
+            if raw_data is not None:
+                r = (d.get('reports') or [{}])[0]
+                if not isinstance(r, dict):
+                    r = {}
+                r['raw_data'] = {
+                    'raw_ins': raw_data.get('raw_ins') if isinstance(raw_data.get('raw_ins'), list) else (r.get('raw_data') or {}).get('raw_ins') or [],
+                    'raw_fin': raw_data.get('raw_fin') if isinstance(raw_data.get('raw_fin'), list) else (r.get('raw_data') or {}).get('raw_fin') or [],
+                    'members': raw_data.get('members') if isinstance(raw_data.get('members'), dict) else (r.get('raw_data') or {}).get('members') or {}
+                }
+                r['family'] = d.get('family_name', 'כללי')
+                if not d.get('reports'):
+                    d['reports'] = []
+                d['reports'][0] = r
+            _save_dashboards_json(data)
+            return True
+    return False
+
+def api_create_dashboard(family_name, raw_data, html, insights_report, created_by, file_names=None):
+    raw_data = raw_data or {}
+    raw_ins = raw_data.get('raw_ins') or []
+    raw_fin = raw_data.get('raw_fin') or []
+    members = raw_data.get('members') or {}
+    if not family_name or (not raw_ins and not raw_fin and not members):
+        return None, 'family_name ו-raw_data נדרשים'
+    with _CLIENTS_LOCK:
+        clients = _load_clients_json()
+        client_id = _next_id(clients, 'CLI-')
+        clients.append({
+            'id': client_id,
+            'name': family_name,
+            'phone': None,
+            'created_at': datetime.utcnow().isoformat(),
+            'created_by': str(created_by),
+            'notes': None,
+            'contact_email': None
+        })
+        _save_clients_json(clients)
+    with _DASHBOARDS_LOCK:
+        dashboards = _load_dashboards_json()
+        dashboard_id = _next_id(dashboards, 'DSH-')
+        crm_key = _next_crm_key(dashboards)
+        report = {
+            'family': family_name,
+            'html': html or '',
+            'raw_data': {'raw_ins': raw_ins, 'raw_fin': raw_fin, 'members': members},
+            'insights_report': insights_report or {}
+        }
+        dashboards.append({
+            'id': dashboard_id,
+            'crm_key': crm_key,
+            'client_id': client_id,
+            'created_at': datetime.utcnow().isoformat(),
+            'created_by': str(created_by),
+            'family_name': family_name,
+            'reports': [report],
+            'file_names': file_names or []
+        })
+        _save_dashboards_json(dashboards)
+    return api_get_dashboard(dashboard_id), None
 
 class User(UserMixin):
     def __init__(self, user_id, username):
@@ -1952,10 +2114,165 @@ def generate_single_html_report(data):
                           .replace('{{ product_chart_data | tojson }}', json.dumps(product_distribution)) \
                           .replace('{{ equity_fixed_chart_data | tojson }}', json.dumps(equity_fixed_distribution))
 
+def _parse_age(val):
+    """מפרק גיל מטקסט (למשל '35' או '35-40') ומחזיר מספר או None."""
+    if val is None or (isinstance(val, float) and (val != val or val == 0)): return None
+    s = str(val).strip().replace(',', '.')
+    m = re.match(r'^(\d+)', s)
+    return int(m.group(1)) if m else None
+
+def _aggregate_per_client(raw_ins, raw_fin, members):
+    """מאגד נתונים לכל לקוח: פרמיה, כיסוי ריסק חיים, צבירה, גיל."""
+    agg = {}
+    for r in raw_ins or []:
+        c = (r.get('client') or '').strip()
+        if not c: continue
+        if c not in agg: agg[c] = {'prem': 0, 'risk': 0, 'sav': 0, 'age': None, 'has_risk': False}
+        prem = float(r.get('premium') or 0)
+        cov = float(r.get('coverage') or 0)
+        ptype = (r.get('type') or '')
+        agg[c]['prem'] += prem
+        if any(x in ptype for x in ['חיים', 'ריסק', 'מוות', 'משכנתא']):
+            agg[c]['risk'] += cov
+            agg[c]['has_risk'] = True
+    for r in raw_fin or []:
+        c = (r.get('client') or '').strip()
+        if not c: continue
+        if c not in agg: agg[c] = {'prem': 0, 'risk': 0, 'sav': 0, 'age': None, 'has_risk': False}
+        agg[c]['sav'] += float(r.get('balance') or 0)
+    for name, m in (members or {}).items():
+        age = _parse_age(m.get('age'))
+        if name in agg: agg[name]['age'] = age
+        # ניסיון התאמה חלקית (שם משפחה וכו')
+        for c in agg:
+            if c not in (members or {}) and (name in c or c in name) and agg[c]['age'] is None:
+                agg[c]['age'] = age
+                break
+    return agg
+
+def _generate_insights(agg, raw_ins, raw_fin):
+    """מייצר רשימת תובנות מנתונים מאוגדים. מחזיר [{client, text, severity}]."""
+    insights = []
+    SAV_LOW = 50_000
+    SAV_AGE_THRESHOLD = 30
+    for client, d in agg.items():
+        prem, risk, sav, age = d['prem'], d['risk'], d['sav'], d.get('age')
+        if prem > 0 and risk == 0:
+            insights.append({'client': client, 'text': 'משלם פרמיות אך ללא כיסוי ריסק חיים', 'severity': 'חשוב'})
+        if age is not None and age > SAV_AGE_THRESHOLD and sav < SAV_LOW:
+            insights.append({'client': client, 'text': f'צבירה פנסיונית נמוכה (₪{sav:,.0f}) ביחס לגיל', 'severity': 'להערכה'})
+        if prem > 0 and risk > 0 and risk < 100_000:
+            insights.append({'client': client, 'text': f'כיסוי ריסק חיים נמוך (₪{risk:,.0f})', 'severity': 'חשוב'})
+    # פיזור דמי ניהול / ריכוז – לפי גופים
+    companies = {}
+    for r in (raw_fin or []):
+        c = (r.get('client') or '').strip()
+        co = (r.get('company') or r.get('fee') or '').strip() or 'לא צוין'
+        if not c: continue
+        companies.setdefault(c, set()).add(co)
+    for client, g in companies.items():
+        if len(g) == 1 and agg.get(client, {}).get('sav', 0) > 0:
+            insights.append({'client': client, 'text': 'ריכוז במוצר/גוף אחד – כדאי להעריך פיזור', 'severity': 'להערכה'})
+    # חסרים מוצרים סטנדרטיים: אין פנסיה/ביטוח מנהלים/השתלמות
+    fin_products = {}
+    keywords_prod = ['פנסיה', 'מנהלים', 'השתלמות', 'קופ"ג', 'קרן']
+    for r in (raw_fin or []):
+        c = (r.get('client') or '').strip()
+        p = (r.get('product') or '').strip()
+        if not c: continue
+        s = fin_products.setdefault(c, set())
+        for kw in keywords_prod:
+            if kw in p: s.add(kw)
+    for client, d in agg.items():
+        if d.get('sav', 0) == 0: continue
+        prods = fin_products.get(client, set())
+        missing = []
+        if 'פנסיה' not in prods: missing.append('פנסיה')
+        if 'מנהלים' not in prods: missing.append('ביטוח מנהלים')
+        if missing:
+            insights.append({'client': client, 'text': f'חסרים מוצרים סטנדרטיים: {", ".join(missing)}', 'severity': 'להערכה'})
+    return insights
+
+def _generate_recommendations_from_insights(insights):
+    """מייצר המלצות טיפול מתוך תובנות. מחזיר [{title, recommendation, background, client}]."""
+    recs = []
+    for i in insights:
+        t = i['text']
+        c = i.get('client', '')
+        if 'ריסק חיים' in t and 'ללא כיסוי' in t:
+            recs.append({'title': 'כיסוי ריסק חיים', 'recommendation': 'לבחון הוספת ביטוח חיים/ריסק כדי להגן על המשפחה במקרה פטירה.', 'background': t, 'client': c, 'priority': 1})
+        elif 'צבירה פנסיונית נמוכה' in t:
+            recs.append({'title': 'חיסכון פנסיוני', 'recommendation': 'להעריך הגדלת הפרשה לפנסיה או הפעלת תוכנית חיסכון ארוכת טווח.', 'background': t, 'client': c, 'priority': 2})
+        elif 'כיסוי ריסק חיים נמוך' in t:
+            recs.append({'title': 'כיסוי ריסק חיים', 'recommendation': 'לבדוק אם כיסוי ריסק החיים הקיים מספק לפי הכנסה וחובות.', 'background': t, 'client': c, 'priority': 1})
+        elif 'ריכוז' in t and 'פיזור' in t:
+            recs.append({'title': 'פיזור השקעות', 'recommendation': 'להשוות מוצרים בדמי ניהול ולבחון פיזור בין גופים.', 'background': t, 'client': c, 'priority': 3})
+        elif 'חסרים מוצרים' in t:
+            recs.append({'title': 'מוצרים חסרים', 'recommendation': 'לבחון השלמת תיק עם פנסיה, ביטוח מנהלים או השתלמות בהתאם לצרכים.', 'background': t, 'client': c, 'priority': 2})
+    recs.sort(key=lambda x: (x['priority'], x.get('client', '')))
+    return recs
+
+def _executive_summary(insights, recommendations, family_name):
+    """מחזיר 2–4 משפטים סיכום."""
+    name = family_name or 'הלקוח'
+    if not insights and not recommendations:
+        return f"תיק {name} נראה מאוזן. לא זוהו חריגות מרכזיות; מומלץ להמשיך במעקב שגרתי."
+    parts = []
+    n = len(insights)
+    if n > 0:
+        parts.append(f"זוהו {n} תובנות רלוונטיות בתיק {name}.")
+    high = [i for i in insights if i.get('severity') == 'חשוב']
+    if high:
+        parts.append("בין הנקודות החשובות: כיסוי ריסק חיים ועקביות בחיסכון פנסיוני.")
+    if recommendations:
+        parts.append(f"מומלץ לטפל ב־{len(recommendations)} נושאים לפי סדר העדיפות שבדוח.")
+    if not parts:
+        parts.append(f"מומלץ לעבור על התובנות וההמלצות המפורטות בדוח ולהתאים תוכנית טיפול ל־{name}.")
+    return " ".join(parts)
+
+def generate_insights_report(data):
+    """מייצר דוח תובנות והמלצות טיפול. מחזיר dict ל־API."""
+    raw_ins = data.get('raw_ins') or []
+    raw_fin = data.get('raw_fin') or []
+    members = data.get('members') or {}
+    family_name = data.get('family_name') or 'כללי'
+    agg = _aggregate_per_client(raw_ins, raw_fin, members)
+    insights = _generate_insights(agg, raw_ins, raw_fin)
+    recommendations = _generate_recommendations_from_insights(insights)
+    summary = _executive_summary(insights, recommendations, family_name)
+    # נספח טבלאות מקוצר – סיכום ביטוח/פיננסי לפי לקוח (מקוצר)
+    appendix_ins = [{'client': r.get('client'), 'type': r.get('type'), 'coverage': r.get('coverage'), 'premium': r.get('premium')} for r in raw_ins[:50]]
+    appendix_fin = [{'client': r.get('client'), 'product': r.get('product'), 'balance': r.get('balance'), 'fee': r.get('fee')} for r in raw_fin[:50]]
+    return {
+        'executive_summary': summary,
+        'insights': insights,
+        'recommendations': recommendations,
+        'appendix_ins': appendix_ins,
+        'appendix_fin': appendix_fin,
+        'family_name': family_name,
+    }
+
 def generate_recommendations_data(data):
     # פונקציה זו מחזירה נתונים גולמיים ל-Frontend אם צריך (לשימוש בדשבורד)
-    # בקוד הזה אנחנו מתמקדים ב-HTML, אז נשאיר אותה בסיסית או נרחיב לפי הצורך
+    # שמורה לתאימות לאחור; דוח תובנות חדש מגיע מ־generate_insights_report.
     return []
+
+def _has_permission(user, perm):
+    if not user or not getattr(user, 'username', None):
+        return False
+    if user.username == ADMIN_USERNAME:
+        return True
+    ud = get_users_dict().get(user.username) or {}
+    perms = ud.get('permissions') or []
+    return perm in perms
+
+@app.before_request
+def _update_active_session():
+    if current_user.is_authenticated and session.get('_auth_token'):
+        token = session['_auth_token']
+        with _SESSIONS_LOCK:
+            if token in ACTIVE_SESSIONS:
+                ACTIVE_SESSIONS[token]['last_seen_at'] = datetime.utcnow().isoformat()
 
 # --- נתיבי Flask ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -1974,6 +2291,15 @@ def login():
             if bcrypt.checkpw(password.encode('utf-8'), user_data['password_hash'].encode('utf-8')):
                 user = User(user_data['id'], username)
                 login_user(user)
+                token = secrets.token_hex(16)
+                session['_auth_token'] = token
+                with _SESSIONS_LOCK:
+                    ACTIVE_SESSIONS[token] = {
+                        'user_id': user_data['id'],
+                        'username': username,
+                        'login_at': datetime.utcnow().isoformat(),
+                        'last_seen_at': datetime.utcnow().isoformat()
+                    }
                 return jsonify({"success": True, "message": "התחברות הצליחה"})
         
         return jsonify({"error": "שם משתמש או סיסמה שגויים"}), 401
@@ -1983,6 +2309,10 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    token = session.pop('_auth_token', None)
+    if token:
+        with _SESSIONS_LOCK:
+            ACTIVE_SESSIONS.pop(token, None)
     logout_user()
     return redirect(url_for('login'))
 
@@ -2014,8 +2344,16 @@ def admin_page():
 @admin_required
 def admin_list_users():
     users = _load_users_json()
-    out = [{"id": u["id"], "username": u["username"], "role": u.get("role", "user"), "created_at": u.get("created_at")} for u in users]
-    out.insert(0, {"id": ADMIN_ID, "username": ADMIN_USERNAME, "role": "admin", "created_at": None})
+    out = []
+    for u in users:
+        out.append({
+            "id": u["id"],
+            "username": u["username"],
+            "role": u.get("role", "user"),
+            "created_at": u.get("created_at"),
+            "permissions": u.get("permissions") if isinstance(u.get("permissions"), list) else list(DEFAULT_PERMISSIONS)
+        })
+    out.insert(0, {"id": ADMIN_ID, "username": ADMIN_USERNAME, "role": "admin", "created_at": None, "permissions": list(ALL_PERMISSIONS)})
     return jsonify(out)
 
 @app.route('/admin/users', methods=['POST'])
@@ -2037,11 +2375,19 @@ def admin_create_user():
 @admin_required
 def admin_update_user(user_id):
     data = request.get_json(silent=True) or {}
-    new_password = data.get("password") or ""
-    if not new_password:
-        return jsonify({"error": "סיסמה נדרשת"}), 400
-    if not update_user_password(user_id, new_password):
-        return jsonify({"error": "משתמש לא נמצא"}), 404
+    new_password = (data.get("password") or "").strip()
+    permissions = data.get("permissions")
+    updated = False
+    if isinstance(permissions, list):
+        if not update_user_permissions(user_id, permissions):
+            return jsonify({"error": "משתמש לא נמצא"}), 404
+        updated = True
+    if new_password:
+        if not update_user_password(user_id, new_password):
+            return jsonify({"error": "משתמש לא נמצא"}), 404
+        updated = True
+    if not updated:
+        return jsonify({"error": "נדרשת סיסמה או הרשאות לעדכון"}), 400
     return jsonify({"success": True})
 
 @app.route('/admin/users/<user_id>', methods=['DELETE'])
@@ -2061,10 +2407,33 @@ def admin_productions():
     data = get_productions(user_id=user_id if user_id else None, limit=limit)
     return jsonify(data)
 
+@app.route('/admin/sessions')
+@login_required
+@admin_required
+def admin_sessions():
+    with _SESSIONS_LOCK:
+        out = [
+            {"username": v["username"], "user_id": v["user_id"], "login_at": v["login_at"], "last_seen_at": v["last_seen_at"]}
+            for v in ACTIVE_SESSIONS.values()
+        ]
+    return jsonify(out)
+
+@app.route('/admin/permissions-list')
+@login_required
+@admin_required
+def admin_permissions_list():
+    return jsonify({"permissions": [
+        {"id": "view_dashboards", "label": "צפייה בדשבורדים ורשימות"},
+        {"id": "upload", "label": "העלאת קבצים וצור דשבורד"},
+        {"id": "save_crm", "label": "שמירה ל-CRM"},
+        {"id": "delete", "label": "מחיקת תיקים ודשבורדים"},
+        {"id": "admin", "label": "ניהול מערכת (מנהל)"}
+    ]})
+
 @app.route('/render_report', methods=['POST'])
 @login_required
 def render_report():
-    """מקבל raw_data (raw_ins, raw_fin, members) ומחזיר HTML מעודכן – לשימוש אחרי מיזוג 'הוסף קבצים'."""
+    """מקבל raw_data (raw_ins, raw_fin, members) ומחזיר HTML + insights_report – לשימוש אחרי מיזוג 'הוסף קבצים'."""
     if not current_user.is_authenticated:
         return jsonify({"error": "נדרשת התחברות"}), 401
     data = request.get_json(silent=True) or {}
@@ -2077,13 +2446,97 @@ def render_report():
     }
     try:
         html_content = generate_single_html_report(merged)
-        return jsonify({"html": html_content})
+        insights_report = generate_insights_report(merged)
+        return jsonify({"html": html_content, "insights_report": insights_report})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/dashboards', methods=['GET'])
+@login_required
+def api_dashboards_list():
+    if not current_user.is_authenticated:
+        return jsonify({"error": "נדרשת התחברות"}), 401
+    if not _has_permission(current_user, 'view_dashboards'):
+        return jsonify({"error": "אין הרשאה לצפייה"}), 403
+    created_by = request.args.get('created_by')
+    data = api_list_dashboards(created_by=created_by)
+    return jsonify(data)
+
+@app.route('/api/dashboards', methods=['POST'])
+@login_required
+def api_dashboards_create():
+    if not current_user.is_authenticated:
+        return jsonify({"error": "נדרשת התחברות"}), 401
+    if not _has_permission(current_user, 'save_crm'):
+        return jsonify({"error": "אין הרשאה לשמירה ל-CRM"}), 403
+    body = request.get_json(silent=True) or {}
+    family_name = (body.get('family_name') or body.get('family') or 'כללי').strip()
+    raw_data = body.get('raw_data') or {}
+    raw_data = {
+        'raw_ins': raw_data.get('raw_ins') or [],
+        'raw_fin': raw_data.get('raw_fin') or [],
+        'members': raw_data.get('members') or {}
+    }
+    html = body.get('html') or ''
+    insights_report = body.get('insights_report') or {}
+    file_names = body.get('file_names') or []
+    if not family_name:
+        return jsonify({"error": "family_name נדרש"}), 400
+    dash, err = api_create_dashboard(family_name, raw_data, html, insights_report, current_user.id, file_names)
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify(dash), 201
+
+@app.route('/api/dashboards/<dashboard_id>')
+@login_required
+def api_dashboards_get(dashboard_id):
+    if not current_user.is_authenticated:
+        return jsonify({"error": "נדרשת התחברות"}), 401
+    if not _has_permission(current_user, 'view_dashboards'):
+        return jsonify({"error": "אין הרשאה לצפייה"}), 403
+    d = api_get_dashboard(dashboard_id)
+    if not d:
+        return jsonify({"error": "דשבורד לא נמצא"}), 404
+    return jsonify(d)
+
+@app.route('/api/dashboards/<dashboard_id>', methods=['DELETE'])
+@login_required
+def api_dashboards_delete(dashboard_id):
+    if not current_user.is_authenticated:
+        return jsonify({"error": "נדרשת התחברות"}), 401
+    if not _has_permission(current_user, 'delete'):
+        return jsonify({"error": "אין הרשאה למחיקה"}), 403
+    if not api_delete_dashboard(dashboard_id):
+        return jsonify({"error": "דשבורד לא נמצא"}), 404
+    return jsonify({"success": True})
+
+@app.route('/api/dashboards/<dashboard_id>', methods=['PUT'])
+@login_required
+def api_dashboards_update(dashboard_id):
+    if not current_user.is_authenticated:
+        return jsonify({"error": "נדרשת התחברות"}), 401
+    if not _has_permission(current_user, 'save_crm'):
+        return jsonify({"error": "אין הרשאה לעדכון CRM"}), 403
+    body = request.get_json(silent=True) or {}
+    family_name = body.get('family_name')
+    raw_data = body.get('raw_data')
+    if not family_name and not raw_data:
+        return jsonify({"error": "נדרש family_name או raw_data לעדכון"}), 400
+    if not api_update_dashboard(dashboard_id, family_name=family_name, raw_data=raw_data):
+        return jsonify({"error": "דשבורד לא נמצא"}), 404
+    d = api_get_dashboard(dashboard_id)
+    return jsonify(d)
 
 @app.route('/')
 @login_required
 def index():
+    """מסך הבית אחרי התחברות – מערכת CRM מאוחדת (client)"""
+    return send_from_directory('.', 'client.html')
+
+@app.route('/360')
+@login_required
+def page_360():
+    """מבט 360 – העלאה, דשבורד, שמור ל-CRM"""
     return send_from_directory('.', 'index.html')
 
 @app.route('/<path:path>')
@@ -2118,6 +2571,8 @@ def serve_static(path):
 def upload_files():
     if not current_user.is_authenticated:
         return jsonify({"error": "נדרשת התחברות"}), 401
+    if not _has_permission(current_user, 'upload'):
+        return jsonify({"error": "אין הרשאה להעלאת קבצים"}), 403
     if 'files[]' not in request.files: return jsonify({"error": "No files"}), 400
     files = request.files.getlist('files[]')
     grouped_reports = {} 
@@ -2621,10 +3076,12 @@ def upload_files():
     print(f"✓ סה\"כ: {len(merged_data.get('raw_ins', []))} ביטוחים, {len(merged_data.get('raw_fin', []))} פיננסיים, {len(merged_data.get('members', {}))} משתתפים")
     
     html_content = generate_single_html_report(merged_data)
+    insights_report = generate_insights_report(merged_data)
     results = [{ 
         "family": "כללי", 
         "html": html_content,
         "recommendations": [],
+        "insights_report": insights_report,
         "raw_data": {
             "raw_ins": merged_data.get("raw_ins", []),
             "raw_fin": merged_data.get("raw_fin", []),

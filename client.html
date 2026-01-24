@@ -10,6 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 
     <style>
@@ -119,6 +120,61 @@
             }
         }
         .pdf-cover { display: none; }
+
+        /* view-360 (מבט 360) */
+        #view-360 { display: none; flex-direction: column; height: 100%; min-height: 0; }
+        .v360-upload { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        .v360-upload-box { background: white; max-width: 560px; width: 100%; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; }
+        .v360-upload-zone { border: 2px dashed #cbd5e1; border-radius: 16px; padding: 40px 20px; cursor: pointer; transition: 0.3s; background: #fdfdfd; margin: 16px 0; }
+        .v360-upload-zone:hover { border-color: var(--primary); background: #fdf2f8; }
+        .v360-generate { background: var(--primary); color: white; border: none; padding: 14px 28px; border-radius: 12px; font-weight: 700; cursor: pointer; margin-top: 12px; display: none; }
+        .v360-generate:hover { background: #b5179e; }
+        .v360-files-list { max-height: 220px; overflow-y: auto; margin: 12px 0; text-align: right; }
+        .v360-file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; margin-bottom: 6px; background: #f8fafc; border-radius: 10px; font-size: 0.9rem; }
+        .v360-dashboard { display: none; flex-direction: column; flex: 1; min-height: 0; background: #f1f5f9; }
+        .v360-bar { background: #1e1b4b; color: white; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .v360-bar button { background: rgba(255,255,255,0.15); border: none; color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+        .v360-bar button:hover { background: rgba(255,255,255,0.25); }
+        .v360-bar .btn-save-crm { background: #10b981 !important; font-weight: 600; }
+        .v360-bar .btn-save-crm:hover { background: #059669 !important; }
+        .v360-tabs { background: white; padding: 0 16px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 4px; overflow-x: auto; }
+        .v360-tab { padding: 12px 20px; background: transparent; border: none; border-bottom: 3px solid transparent; font-weight: 600; color: #94a3b8; cursor: pointer; white-space: nowrap; }
+        .v360-tab:hover { color: var(--primary); }
+        .v360-tab.active { color: var(--primary); border-bottom-color: var(--primary); background: #fff0f7; }
+        .v360-content { flex: 1; background: #e2e8f0; padding: 16px; overflow: hidden; position: relative; }
+        .v360-content iframe { width: 100%; height: 100%; border: none; background: white; border-radius: 8px; }
+        .v360-recommendations { padding: 20px; overflow-y: auto; height: 100%; background: #f1f5f9; }
+        .v360-loader { width: 48px; height: 48px; border: 4px solid #e2e8f0; border-bottom-color: var(--primary); border-radius: 50%; animation: v360-spin 1s linear infinite; margin: 20px auto; display: none; }
+        @keyframes v360-spin { to { transform: rotate(360deg); } }
+        .v360-toast { position: fixed; top: 20px; left: 20px; z-index: 10000; background: white; padding: 14px 18px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; border-right: 4px solid #10b981; animation: v360-toast-in 0.3s ease; }
+        .v360-toast.err { border-color: #ef4444; }
+        @keyframes v360-toast-in { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .v360-progress { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: none; align-items: center; justify-content: center; }
+        .v360-progress.active { display: flex; }
+        .v360-progress-box { background: white; padding: 24px 32px; border-radius: 16px; min-width: 280px; }
+        .v360-client-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2002; align-items: center; justify-content: center; }
+        .v360-client-modal.active { display: flex; }
+        .v360-client-modal .modal-inner { background: white; border-radius: 20px; max-width: 640px; width: 90%; max-height: 85vh; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        .v360-client-modal .modal-header { padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .v360-client-modal .modal-body { padding: 20px; overflow-y: auto; max-height: 60vh; }
+        .insights-report { max-width: 900px; margin: 0 auto; direction: rtl; text-align: right; }
+        .insights-report .ir-header { text-align: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 3px solid #0284c7; }
+        .insights-report .ir-section { margin-bottom: 20px; }
+        .insights-report .ir-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 16px; }
+        .insights-report .ir-table th, .insights-report .ir-table td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
+        .insights-report .ir-table th { background: #f1f5f9; font-weight: 700; }
+        .crm-edit-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2100; align-items: center; justify-content: center; }
+        .crm-edit-modal.active { display: flex; }
+        .crm-edit-modal .modal-inner { background: white; border-radius: 20px; max-width: 900px; width: 95%; max-height: 90vh; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.25); display: flex; flex-direction: column; }
+        .crm-edit-modal .modal-header { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .crm-edit-modal .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .crm-edit-modal .editable-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 20px; }
+        .crm-edit-modal .editable-table th, .crm-edit-modal .editable-table td { border: 1px solid #e2e8f0; padding: 8px; text-align: right; }
+        .crm-edit-modal .editable-table th { background: #f1f5f9; font-weight: 700; }
+        .crm-edit-modal .editable-table input { width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px; }
+        .crm-edit-modal .editable-table .col-actions { width: 40px; }
+        .crm-edit-modal .sec-title { font-weight: 700; color: #1e293b; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--primary); }
+        .crm-edit-modal .sec-title:first-child { margin-top: 0; }
     </style>
 </head>
 <body>
@@ -149,15 +205,18 @@
             <div class="nav-item" id="nav-families" onclick="router('families')">
                 <i class="fas fa-users"></i> תיקים משפחתיים
             </div>
-            
+            <div class="nav-item" id="nav-360" onclick="router('360')">
+                <i class="fas fa-layer-group"></i> צור דשבורד
+            </div>
             <div class="nav-item" onclick="openUploadModal()">
                 <i class="fas fa-cloud-upload-alt text-success"></i> <span class="fw-bold text-success">טעינת נתונים</span>
             </div>
             
             <div style="margin-top: auto;">
-                <div class="nav-item text-danger" onclick="location.reload()">
+                <a href="/admin" class="nav-item" id="navAdmin" style="display: none; text-decoration: none; color: inherit;"><i class="fas fa-cog"></i> ניהול</a>
+                <a href="/logout" class="nav-item text-danger" style="text-decoration: none; color: #dc2626;">
                     <i class="fas fa-sign-out-alt"></i> יציאה
-                </div>
+                </a>
             </div>
         </nav>
 
@@ -253,7 +312,73 @@
                 <div id="members-details-area"></div>
             </div>
 
+            <div id="view-360">
+                <div class="v360-upload" id="v360Upload">
+                    <div class="v360-upload-box">
+                        <h4 class="fw-bold mb-2"><i class="fas fa-layer-group text-primary me-2"></i>מבט 360 – צור דשבורד</h4>
+                        <p class="text-muted small mb-3">גרור קבצי DAT / Excel / CSV לכאן או בחר קבצים</p>
+                        <div class="v360-upload-zone" id="v360DropZone" onclick="document.getElementById('v360FileInput').click()">
+                            <i class="fas fa-cloud-upload-alt fa-2x text-muted mb-2"></i>
+                            <div>לחץ לבחירה או גרור קבצים</div>
+                        </div>
+                        <div id="v360FilesCount" class="small text-primary fw-bold mb-2" style="display:none;"></div>
+                        <div id="v360FilesList" class="v360-files-list" style="display:none;"></div>
+                        <div class="v360-loader" id="v360Loader"></div>
+                        <button type="button" class="v360-generate" id="v360Generate" onclick="v360UploadFiles()"><i class="fas fa-magic me-2"></i>צור דשבורד</button>
+                        <input type="file" id="v360FileInput" multiple accept=".csv,.xlsx,.xls,.dat" style="display:none">
+                    </div>
+                </div>
+                <div class="v360-dashboard" id="v360Dashboard">
+                    <div class="v360-bar">
+                        <span class="fw-bold"><i class="fas fa-layer-group me-2"></i>מבט 360</span>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <button type="button" class="btn-save-crm" onclick="v360SaveToCrm()"><i class="fas fa-save"></i> שמור ל-CRM</button>
+                            <button type="button" onclick="v360AddFiles()"><i class="fas fa-plus-circle"></i> הוסף קבצים</button>
+                            <button type="button" onclick="v360DownloadPdf()"><i class="fas fa-file-download"></i> הורד PDF</button>
+                            <button type="button" onclick="v360ExportExcel()"><i class="fas fa-file-excel"></i> Excel</button>
+                            <button type="button" onclick="v360Print()"><i class="fas fa-print"></i> הדפסה</button>
+                            <button type="button" onclick="v360PrintInsights()"><i class="fas fa-lightbulb"></i> דוח תובנות</button>
+                            <button type="button" onclick="v360BackToUpload()"><i class="fas fa-arrow-right"></i> חזור להעלאה</button>
+                        </div>
+                    </div>
+                    <div class="v360-tabs" id="v360Tabs"></div>
+                    <div class="v360-content" id="v360Content"></div>
+                </div>
+            </div>
+
         </main>
+    </div>
+
+    <div id="v360ClientModal" class="v360-client-modal" onclick="if(event.target===this) v360CloseClientModal()">
+        <div class="modal-inner" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h5 class="mb-0" id="v360ModalTitle">מוצרי לקוח</h5>
+                <button type="button" class="btn btn-sm btn-light rounded-circle" onclick="v360CloseClientModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="v360ModalBody"></div>
+        </div>
+    </div>
+    <div id="v360Progress" class="v360-progress">
+        <div class="v360-progress-box">
+            <div class="fw-bold mb-2" id="v360ProgressTitle">מכין PDF...</div>
+            <div class="progress" style="height:8px;"><div class="progress-bar" id="v360ProgressBar" role="progressbar" style="width:0%"></div></div>
+            <div class="small text-muted mt-1 text-center" id="v360ProgressText">0%</div>
+        </div>
+    </div>
+    <div id="v360Toast"></div>
+
+    <div id="crmEditModal" class="crm-edit-modal" onclick="if(event.target===this) closeCrmEditModal()">
+        <div class="modal-inner" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h4 class="mb-0"><i class="fas fa-edit me-2"></i>עריכת תיק CRM <span id="crmEditKeyLabel" class="badge bg-secondary me-2"></span></h4>
+                <button type="button" class="btn btn-sm btn-light rounded-circle" onclick="closeCrmEditModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="crmEditBody"></div>
+            <div class="modal-footer p-3 border-top d-flex gap-2 justify-content-end">
+                <button type="button" class="btn btn-secondary" onclick="closeCrmEditModal()">ביטול</button>
+                <button type="button" class="btn btn-primary" id="crmEditSave"><i class="fas fa-save me-1"></i>שמור שינויים</button>
+            </div>
+        </div>
     </div>
 
     <div id="uploadModal" class="modal-overlay">
@@ -309,8 +434,73 @@
         let currentFamilyKey = null;
         let ChartP = null, ChartB = null, MainChart = null;
         let selectedFiles = []; // רשימת קבצים שנבחרו להעלאה
+        let savedDashboards = []; // נשמרו מ-360 (GET /api/dashboards)
 
-        // --- Auth ---
+        // --- כניסה מ־מרכז לקוחות (menu_crm) – בלי התחברות נוספת ---
+        (function tryLoadFromMenuCrm() {
+            const params = new URLSearchParams(location.search);
+            if (params.get('from') !== 'menu_crm') return;
+            const familyParam = params.get('family');
+            if (!familyParam) return;
+            let ctx;
+            try { ctx = JSON.parse(sessionStorage.getItem('crm_context') || '{}'); } catch (e) { return; }
+            if (!ctx || !ctx.raw_data) return;
+            const family = (ctx.family_name || familyParam || 'כללי').trim();
+            const raw = ctx.raw_data;
+            const raw_ins = raw.raw_ins || [];
+            const raw_fin = raw.raw_fin || [];
+            const membersData = raw.members || {};
+            Families[family] = { members: {}, rawFiles: [] };
+            const mem = Families[family].members;
+            function pNum(v) { return parseFloat((v || 0).toString().replace(/[^\d.-]/g, '')) || 0; }
+            raw_ins.forEach(function (r) {
+                const name = (r.client || '').trim();
+                if (!name) return;
+                if (!mem[name]) mem[name] = { ins: [], fin: [], details: {} };
+                mem[name].ins.push({ type: r.type || '', co: r.company || '', cost: pNum(r.premium), cov: pNum(r.coverage), note: r.notes || '' });
+            });
+            raw_fin.forEach(function (r) {
+                const name = (r.client || '').trim();
+                if (!name) return;
+                if (!mem[name]) mem[name] = { ins: [], fin: [], details: {} };
+                mem[name].fin.push({ prod: r.product || '', co: r.company || '', bal: pNum(r.balance), fee: r.fee || '', rec: r.rec || '' });
+            });
+            Object.keys(membersData).forEach(function (name) {
+                const n = (name || '').trim();
+                if (!n) return;
+                if (!mem[n]) mem[n] = { ins: [], fin: [], details: {} };
+                const d = membersData[name] || {};
+                mem[n].details = { age: d.age, job: d.job, status: d.status };
+            });
+            sessionStorage.removeItem('crm_context');
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('appLayout').style.display = 'flex';
+            const w = document.getElementById('welcomeUser');
+            if (w) w.innerText = 'מרכז לקוחות';
+            const cardImg = document.querySelector('.login-card img');
+            if (cardImg && cardImg.style.display === 'none' && document.getElementById('defIcon'))
+                document.getElementById('defIcon').style.display = 'block';
+            window._pendingCrmFamily = family;
+        })();
+
+        // --- התחברות Flask: ב־/ מחוברים כבר – דילוג מסך התחברות, מערכת אחת ---
+        fetch('/check_auth', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.authenticated && !window._pendingCrmFamily) {
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('appLayout').style.display = 'flex';
+                    var w = document.getElementById('welcomeUser');
+                    if (w) w.innerText = d.username || 'משתמש';
+                    var na = document.getElementById('navAdmin');
+                    if (na && d.username === 'ADMIN') na.style.display = 'flex';
+                    initMainChart();
+                    router('families');
+                }
+            })
+            .catch(function() {});
+
+        // --- Auth (מסך התחברות מקומי רק כש־client נטען בלי Flask) ---
         document.getElementById('pass').addEventListener('keypress', e => { if(e.key==='Enter') login(); });
         
         function login() {
@@ -330,13 +520,349 @@
 
         // --- Router ---
         function router(view) {
-            ['view-home','view-families','clientView'].forEach(id => document.getElementById(id).style.display='none');
-            document.getElementById(view === 'profile' ? 'clientView' : 'view-'+view).style.display='block';
+            ['view-home','view-families','clientView','view-360'].forEach(id => { var el = document.getElementById(id); if(el) el.style.display = 'none'; });
+            var target = view === 'profile' ? 'clientView' : (view === '360' ? 'view-360' : 'view-'+view);
+            var targetEl = document.getElementById(target);
+            if(targetEl) targetEl.style.display = (view === '360' ? 'flex' : 'block');
+            if (view === '360') { if (typeof v360ReportsData !== 'undefined' && v360ReportsData.length) v360ShowDashboard(); else v360ShowUpload(); }
+            if (view === 'families') loadSavedDashboards(renderFamilies);
             
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            const navId = view === 'profile' ? 'nav-families' : 'nav-'+view;
-            if(document.getElementById(navId)) document.getElementById(navId).classList.add('active');
+            var navId = view === 'profile' ? 'nav-families' : 'nav-' + view;
+            var navEl = document.getElementById(navId);
+            if (navEl) navEl.classList.add('active');
         }
+
+        // --- מבט 360 (צור דשבורד) ---
+        let v360ReportsData = [], v360ActiveReportIndex = 0, v360SelectedFiles = [];
+        function v360ShowUpload() {
+            var up = document.getElementById('v360Upload'), d = document.getElementById('v360Dashboard');
+            if (up) up.style.display = 'flex';
+            if (d) d.style.display = 'none';
+        }
+        function v360ShowDashboard() {
+            var up = document.getElementById('v360Upload'), d = document.getElementById('v360Dashboard');
+            if (up) up.style.display = 'none';
+            if (d) d.style.display = 'flex';
+        }
+        function v360Toast(msg, isErr) {
+            var el = document.getElementById('v360Toast');
+            if (!el) return;
+            el.textContent = msg;
+            el.className = 'v360-toast' + (isErr ? ' err' : '');
+            el.style.display = 'block';
+            setTimeout(function() { el.style.display = 'none'; }, 3000);
+        }
+        function v360Validate(files) {
+            var max = 10 * 1024 * 1024, ok = ['.csv','.xlsx','.xls','.dat'], err = [];
+            for (var i = 0; i < files.length; i++) {
+                var f = files[i], ext = '.' + (f.name.split('.').pop() || '').toLowerCase();
+                if (ok.indexOf(ext) === -1) err.push('קובץ ' + f.name + ' לא נתמך');
+                else if (f.size > max) err.push('קובץ ' + f.name + ' גדול מדי');
+            }
+            if (files.length > 50) err.push('מקסימום 50 קבצים');
+            return err;
+        }
+        function v360UpdateFilesDisplay() {
+            var list = document.getElementById('v360FilesList'), cnt = document.getElementById('v360FilesCount'), btn = document.getElementById('v360Generate');
+            if (v360SelectedFiles.length === 0) {
+                if (list) list.style.display = 'none';
+                if (cnt) cnt.style.display = 'none';
+                if (btn) btn.style.display = 'none';
+                return;
+            }
+            if (cnt) { cnt.style.display = 'block'; cnt.textContent = v360SelectedFiles.length + ' קבצים'; }
+            if (btn) btn.style.display = 'inline-block';
+            if (!list) return;
+            list.style.display = 'block';
+            list.innerHTML = '';
+            v360SelectedFiles.forEach(function(f, i) {
+                var div = document.createElement('div');
+                div.className = 'v360-file-item';
+                div.innerHTML = '<span>' + f.name + '</span><button type="button" class="btn btn-sm btn-outline-danger" onclick="v360RemoveFile(' + i + ')"><i class="fas fa-times"></i></button>';
+                list.appendChild(div);
+            });
+        }
+        function v360RemoveFile(i) {
+            v360SelectedFiles.splice(i, 1);
+            v360UpdateFilesDisplay();
+        }
+        function v360AddFiles() { document.getElementById('v360FileInput').click(); }
+        function v360BackToUpload() {
+            v360ShowUpload();
+            v360ReportsData = [];
+            v360ActiveReportIndex = 0;
+        }
+        document.getElementById('v360FileInput').addEventListener('change', function(e) {
+            var files = e.target.files;
+            if (!files || !files.length) return;
+            var err = v360Validate(Array.from(files));
+            if (err.length) { Swal.fire('שגיאות', err.join('\n'), 'error'); e.target.value = ''; return; }
+            Array.from(files).forEach(function(f) {
+                var exists = v360SelectedFiles.some(function(x) { return x.name === f.name && x.size === f.size; });
+                if (!exists) v360SelectedFiles.push(f);
+            });
+            e.target.value = '';
+            v360UpdateFilesDisplay();
+        });
+        var dropZone = document.getElementById('v360DropZone');
+        if (dropZone) {
+            ['dragenter','dragover','dragleave','drop'].forEach(function(ev) {
+                dropZone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); }, false);
+            });
+            dropZone.addEventListener('drop', function(e) {
+                var files = e.dataTransfer.files;
+                if (!files || !files.length) return;
+                var err = v360Validate(Array.from(files));
+                if (err.length) { Swal.fire('שגיאות', err.join('\n'), 'error'); return; }
+                Array.from(files).forEach(function(f) {
+                    var exists = v360SelectedFiles.some(function(x) { return x.name === f.name && x.size === f.size; });
+                    if (!exists) v360SelectedFiles.push(f);
+                });
+                v360UpdateFilesDisplay();
+            }, false);
+        }
+        async function v360UploadFiles() {
+            if (v360SelectedFiles.length === 0) { Swal.fire('אזהרה', 'בחר קבצים להעלאה', 'warning'); return; }
+            var loader = document.getElementById('v360Loader'), btn = document.getElementById('v360Generate');
+            if (loader) loader.style.display = 'block';
+            if (btn) btn.disabled = true;
+            var fd = new FormData();
+            v360SelectedFiles.forEach(function(f) { fd.append('files[]', f); });
+            try {
+                var r = await fetch('/upload', { method: 'POST', body: fd, credentials: 'include', signal: AbortSignal.timeout(120000) });
+                if (r.status === 401) { window.location.href = '/login'; return; }
+                if (!r.ok) throw new Error('שגיאת שרת');
+                var data = await r.json();
+                if (!data || !data.length) { v360Toast('לא נמצאו נתונים', true); return; }
+                v360ReportsData = data;
+                v360ActiveReportIndex = 0;
+                v360InitDashboard();
+                v360ShowDashboard();
+            } catch (e) {
+                v360Toast('שגיאה: ' + (e.message || 'העלאה נכשלה'), true);
+            } finally {
+                if (loader) loader.style.display = 'none';
+                if (btn) btn.disabled = false;
+            }
+        }
+        function v360BuildInsightsHtml(ir, family, idx) {
+            var f = family || 'כללי', d = new Date().toLocaleDateString('he-IL', { day:'numeric', month:'long', year:'numeric' });
+            var h = '<div class="insights-report" data-report-index="' + idx + '">';
+            h += '<div class="ir-header"><i class="fas fa-lightbulb"></i><h1>דוח תובנות והמלצות טיפול</h1><p class="ir-meta">' + f + ' | ' + d + '</p></div>';
+            var sum = (ir.executive_summary || '').trim();
+            if (sum) h += '<section class="ir-section"><h2>סיכום תמציתי</h2><p>' + sum + '</p></section>';
+            var ins = ir.insights || [];
+            if (ins.length) {
+                h += '<section class="ir-section"><h2>תובנות</h2><ul>';
+                ins.forEach(function(i) { h += '<li><strong>' + (i.client || '') + '</strong>: ' + (i.text || '') + '</li>'; });
+                h += '</ul></section>';
+            }
+            var rec = ir.recommendations || [];
+            if (rec.length) {
+                h += '<section class="ir-section"><h2>המלצות טיפול</h2>';
+                rec.forEach(function(r) {
+                    h += '<div class="mb-3 p-3 border rounded"><h3 class="h6">' + (r.title || '') + '</h3><p class="mb-0">' + (r.recommendation || '') + '</p></div>';
+                });
+                h += '</section>';
+            }
+            if (!sum && !ins.length && !rec.length) h += '<div class="ir-section text-center text-muted"><p>אין המלצות נוספות.</p></div>';
+            h += '</div>';
+            return h;
+        }
+        function v360InitDashboard() {
+            var tabs = document.getElementById('v360Tabs'), content = document.getElementById('v360Content');
+            tabs.innerHTML = '';
+            content.innerHTML = '';
+            v360ReportsData.forEach(function(report, ri) {
+                var ti = ri * 2;
+                var t1 = document.createElement('button');
+                t1.type = 'button';
+                t1.className = 'v360-tab' + (ri === 0 ? ' active' : '');
+                t1.textContent = report.family || 'דוח ' + (ri + 1);
+                t1.onclick = function() { v360SwitchTab(ti); };
+                tabs.appendChild(t1);
+                var t2 = document.createElement('button');
+                t2.type = 'button';
+                t2.className = 'v360-tab';
+                t2.innerHTML = '<i class="fas fa-lightbulb me-1"></i> דוח תובנות';
+                t2.onclick = function() { v360SwitchTab(ti + 1); };
+                tabs.appendChild(t2);
+                var ifr = document.createElement('iframe');
+                ifr.id = 'v360-frame-' + ti;
+                ifr.style.display = ri === 0 ? 'block' : 'none';
+                content.appendChild(ifr);
+                if (ri === 0 && report.html) v360LoadReportContent(ifr, report.html);
+                var recDiv = document.createElement('div');
+                recDiv.id = 'v360-rec-' + (ti + 1);
+                recDiv.className = 'v360-recommendations';
+                recDiv.style.display = 'none';
+                recDiv.innerHTML = v360BuildInsightsHtml(report.insights_report || {}, report.family, ri);
+                content.appendChild(recDiv);
+            });
+            v360ActiveReportIndex = 0;
+        }
+        function v360LoadReportContent(ifr, html) {
+            try {
+                var doc = ifr.contentWindow.document;
+                doc.open();
+                doc.write(html);
+                doc.close();
+                setTimeout(function() { v360AddClientListeners(ifr); }, 400);
+            } catch (e) { ifr.srcdoc = html; setTimeout(function() { v360AddClientListeners(ifr); }, 400); }
+        }
+        function v360AddClientListeners(ifr) {
+            try {
+                var doc = ifr.contentDocument || ifr.contentWindow.document;
+                var cells = doc.querySelectorAll('td.font-bold, .mem-item strong');
+                cells.forEach(function(c) {
+                    var name = (c.textContent || '').trim();
+                    if (!name || name.length < 2 || name.indexOf('סה"כ') >= 0 || name.indexOf('₪') >= 0) return;
+                    c.style.cursor = 'pointer';
+                    c.title = 'לחץ לראות מוצרים';
+                    c.onclick = function(ev) { ev.stopPropagation(); v360ShowClientProducts(name); };
+                });
+            } catch (e) {}
+        }
+        function v360ShowClientProducts(name) {
+            var modal = document.getElementById('v360ClientModal'), title = document.getElementById('v360ModalTitle'), body = document.getElementById('v360ModalBody');
+            if (!modal || !title || !body) return;
+            title.textContent = 'מוצרים של ' + name;
+            var rep = v360ReportsData[Math.floor(v360ActiveReportIndex / 2)];
+            if (!rep || !rep.raw_data) { body.innerHTML = '<p class="text-muted">אין נתונים.</p>'; modal.classList.add('active'); return; }
+            var raw = rep.raw_data, html = '';
+            var ins = (raw.raw_ins || []).filter(function(x) { return x.client === name; });
+            if (ins.length) {
+                html += '<h6>ביטוח</h6><ul class="list-unstyled small">';
+                ins.forEach(function(x) { html += '<li>' + (x.type || '') + ' – ' + (x.company || '') + (x.coverage ? ' ₪' + Number(x.coverage).toLocaleString() : '') + '</li>'; });
+                html += '</ul>';
+            }
+            var fin = (raw.raw_fin || []).filter(function(x) { return x.client === name; });
+            if (fin.length) {
+                html += '<h6>פיננסי</h6><ul class="list-unstyled small">';
+                fin.forEach(function(x) { html += '<li>' + (x.product || '') + ' – ' + (x.company || '') + (x.balance ? ' ₪' + Number(x.balance).toLocaleString() : '') + '</li>'; });
+                html += '</ul>';
+            }
+            if (!html) html = '<p class="text-muted">אין מוצרים.</p>';
+            body.innerHTML = html;
+            modal.classList.add('active');
+        }
+        function v360CloseClientModal() {
+            var m = document.getElementById('v360ClientModal');
+            if (m) m.classList.remove('active');
+        }
+        function v360SwitchTab(idx) {
+            var n = v360ReportsData.length * 2;
+            if (idx < 0 || idx >= n) return;
+            v360ActiveReportIndex = idx;
+            document.querySelectorAll('.v360-tab').forEach(function(t, i) { t.classList.toggle('active', i === idx); });
+            var content = document.getElementById('v360Content');
+            if (content) {
+                content.querySelectorAll('iframe').forEach(function(f) { f.style.display = 'none'; });
+                content.querySelectorAll('.v360-recommendations').forEach(function(r) { r.style.display = 'none'; });
+            }
+            if (idx % 2 === 0) {
+                var ifr = document.getElementById('v360-frame-' + idx);
+                if (ifr && v360ReportsData[idx/2]) {
+                    ifr.style.display = 'block';
+                    if (v360ReportsData[idx/2].html) v360LoadReportContent(ifr, v360ReportsData[idx/2].html);
+                }
+            } else {
+                var rec = document.getElementById('v360-rec-' + (idx + 1));
+                if (rec) rec.style.display = 'block';
+            }
+        }
+        async function v360SaveToCrm() {
+            if (!v360ReportsData.length) { v360Toast('אין דשבורד לשמירה', true); return; }
+            var r = v360ReportsData[0];
+            var defaultName = (r.family || r.family_name || 'כללי').trim();
+            var swalResult = await Swal.fire({
+                title: 'שמור ל-CRM',
+                text: 'מה שם הלקוח לתצוגה?',
+                input: 'text',
+                inputValue: defaultName,
+                inputPlaceholder: 'שם המשפחה / הלקוח',
+                showCancelButton: true,
+                confirmButtonText: 'שמור',
+                cancelButtonText: 'ביטול'
+            });
+            if (!swalResult.isConfirmed) return;
+            var familyName = (swalResult.value || '').trim() || defaultName;
+            var payload = { family_name: familyName, raw_data: r.raw_data || { raw_ins: [], raw_fin: [], members: {} }, html: r.html || '', insights_report: r.insights_report || {} };
+            try {
+                var res = await fetch('/api/dashboards', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (res.status === 401) { window.location.href = '/login'; return; }
+                if (!res.ok) { var j = await res.json().catch(function() { return {}; }); v360Toast('שמירה נכשלה: ' + (j.error || res.statusText), true); return; }
+                v360Toast('נשמר ל-CRM בהצלחה');
+                v360ReportsData = [];
+                router('families');
+                if (typeof renderFamilies === 'function') renderFamilies();
+            } catch (e) { v360Toast('שגיאה: ' + (e.message || 'שמירה נכשלה'), true); }
+        }
+        function v360Print() {
+            if (v360ActiveReportIndex % 2 === 1) {
+                var rec = document.getElementById('v360-rec-' + (v360ActiveReportIndex + 1));
+                if (rec) {
+                    var w = window.open('', '_blank');
+                    w.document.write('<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>דוח תובנות</title><link href="https://fonts.googleapis.com/css2?family=Assistant&display=swap" rel="stylesheet"><style>body{font-family:Assistant;margin:20px;direction:rtl}</style></head><body>' + (rec.querySelector('.insights-report') ? rec.querySelector('.insights-report').outerHTML : rec.innerHTML) + '</body></html>');
+                    w.document.close();
+                    w.focus();
+                    setTimeout(function() { w.print(); w.close(); }, 500);
+                }
+                return;
+            }
+            var ifr = document.getElementById('v360-frame-' + v360ActiveReportIndex);
+            if (ifr && ifr.contentWindow) ifr.contentWindow.print();
+        }
+        function v360PrintInsights() {
+            var rep = v360ReportsData[Math.floor(v360ActiveReportIndex / 2)];
+            var ir = rep ? (rep.insights_report || {}) : {}, fam = rep ? (rep.family || 'כללי') : 'כללי';
+            var html = v360BuildInsightsHtml(ir, fam, 0);
+            var w = window.open('', '_blank');
+            w.document.write('<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>דוח תובנות – ' + fam + '</title><link href="https://fonts.googleapis.com/css2?family=Assistant&display=swap" rel="stylesheet"><style>body{font-family:Assistant;margin:20px;direction:rtl}</style></head><body>' + html + '</body></html>');
+            w.document.close();
+            w.focus();
+            setTimeout(function() { w.print(); }, 500);
+        }
+        function v360ExportExcel() {
+            var rep = v360ReportsData[Math.floor(v360ActiveReportIndex / 2)];
+            if (!rep) { v360Toast('אין דוח', true); return; }
+            var d = rep.raw_data || {}, csv = 'דוח: ' + (rep.family || 'כללי') + '\nתאריך: ' + new Date().toLocaleDateString('he-IL') + '\n\n';
+            if ((d.raw_ins || []).length) {
+                csv += 'מבוטח,חברה,סוג,כיסוי,פרמיה\n';
+                d.raw_ins.forEach(function(x) { csv += '"' + (x.client||'') + '","' + (x.company||'') + '","' + (x.type||'') + '",' + (x.coverage||0) + ',' + (x.premium||0) + '\n'; });
+            }
+            if ((d.raw_fin || []).length) {
+                csv += '\nחוסך,מוצר,חברה,צבירה\n';
+                d.raw_fin.forEach(function(x) { csv += '"' + (x.client||'') + '","' + (x.product||'') + '","' + (x.company||'') + '",' + (x.balance||0) + '\n'; });
+            }
+            var a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\ufeff' + csv);
+            a.download = 'דוח_' + (rep.family || 'כללי') + '_' + new Date().toISOString().slice(0,10) + '.csv';
+            a.click();
+            v360Toast('יוצא בהצלחה');
+        }
+        function v360DownloadPdf() {
+            var ifr = document.getElementById('v360-frame-' + (Math.floor(v360ActiveReportIndex / 2) * 2));
+            if (!ifr || !ifr.contentWindow) { v360Toast('אין דוח לייצוא', true); return; }
+            if (v360ActiveReportIndex % 2 === 1) {
+                var rec = document.getElementById('v360-rec-' + (v360ActiveReportIndex + 1));
+                if (rec && window.html2pdf) {
+                    var opt = { margin: 8, filename: 'דוח_תובנות.pdf', html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4' } };
+                    html2pdf().set(opt).from(rec.querySelector('.insights-report') || rec).save().then(function() { v360Toast('ה-PDF הורד'); }).catch(function() { v360Toast('שגיאה ב-PDF', true); });
+                }
+                return;
+            }
+            try {
+                ifr.contentWindow.print();
+            } catch (e) { v360Toast('שגיאה בהדפסה', true); }
+        }
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                v360CloseClientModal();
+                if (document.getElementById('crmEditModal').classList.contains('active')) closeCrmEditModal();
+            }
+        });
 
         // --- Modal Logic ---
         function openUploadModal() { 
@@ -601,47 +1127,311 @@
             document.getElementById('kpi-prem').innerText = '₪'+totalPrem.toLocaleString();
         }
 
+        function loadSavedDashboards(cb) {
+            fetch('/api/dashboards', { credentials: 'include' }).then(function(r) {
+                if (r.status === 401) return [];
+                return r.ok ? r.json() : [];
+            }).catch(function() { return []; }).then(function(arr) {
+                savedDashboards = Array.isArray(arr) ? arr : [];
+                if (typeof cb === 'function') cb();
+            });
+        }
+        async function openDashboard360(id) {
+            try {
+                var r = await fetch('/api/dashboards/' + encodeURIComponent(id), { credentials: 'include' });
+                if (r.status === 401) { window.location.href = '/login'; return; }
+                if (!r.ok) { Swal.fire('שגיאה', 'דשבורד לא נמצא', 'error'); return; }
+                var d = await r.json();
+                var reports = (d.reports || []).map(function(x) {
+                    return { family: x.family || d.family_name || 'כללי', html: x.html || '', raw_data: x.raw_data || {}, insights_report: x.insights_report || {} };
+                });
+                if (!reports.length) { Swal.fire('אזהרה', 'אין דוחות בדשבורד', 'warning'); return; }
+                v360ReportsData = reports;
+                v360ActiveReportIndex = 0;
+                v360InitDashboard();
+                v360ShowDashboard();
+                router('360');
+            } catch (e) { Swal.fire('שגיאה', e.message || 'טעינה נכשלה', 'error'); }
+        }
+        function openDashboardAsClientById(id) {
+            var d = savedDashboards.filter(function(x) { return x.id === id; })[0];
+            if (!d) { Swal.fire('שגיאה', 'דשבורד לא נמצא', 'error'); return; }
+            openDashboardAsClient(d);
+        }
+        function deleteFamily(fName) {
+            Swal.fire({
+                title: 'מחיקת תיק',
+                text: 'למחוק את "' + fName + '" מהרשימה?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonText: 'ביטול',
+                confirmButtonText: 'מחק'
+            }).then(function(res) {
+                if (!res.isConfirmed) return;
+                delete Families[fName];
+                renderFamilies();
+                updateHomeStats();
+                Swal.fire('נמחק', 'התיק הוסר מהרשימה.', 'success');
+            });
+        }
+        async function deleteDashboard360(id) {
+            var d = savedDashboards.filter(function(x) { return x.id === id; })[0];
+            var fn = d ? (d.family_name || 'כללי').trim() : '';
+            var ok = await Swal.fire({
+                title: 'מחיקת דשבורד',
+                text: 'למחוק את הדשבורד "' + fn + '" ממושמרי 360?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonText: 'ביטול',
+                confirmButtonText: 'מחק'
+            }).then(function(r) { return r.isConfirmed; });
+            if (!ok) return;
+            try {
+                var r = await fetch('/api/dashboards/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'include' });
+                if (r.status === 401) { window.location.href = '/login'; return; }
+                if (!r.ok) { Swal.fire('שגיאה', 'מחיקה נכשלה', 'error'); return; }
+                loadSavedDashboards(renderFamilies);
+                Swal.fire('נמחק', 'הדשבורד הוסר.', 'success');
+            } catch (e) { Swal.fire('שגיאה', e.message || 'מחיקה נכשלה', 'error'); }
+        }
+
+        var _crmEditDashboardId = null;
+        var _crmEditInsKeys = ['client','company','type','policy','start_date','coverage','premium','notes'];
+        var _crmEditFinKeys = ['client','product','company','balance','fee','risk','simulation','status','rec'];
+
+        function closeCrmEditModal() {
+            document.getElementById('crmEditModal').classList.remove('active');
+            _crmEditDashboardId = null;
+        }
+        async function openEditCrmModal(id) {
+            try {
+                var r = await fetch('/api/dashboards/' + encodeURIComponent(id), { credentials: 'include' });
+                if (r.status === 401) { window.location.href = '/login'; return; }
+                if (!r.ok) { Swal.fire('שגיאה', 'דשבורד לא נמצא', 'error'); return; }
+                var d = await r.json();
+                _crmEditDashboardId = id;
+                renderCrmEditForm(d);
+                var lbl = document.getElementById('crmEditKeyLabel');
+                if (lbl) lbl.textContent = d.crm_key || d.id || '';
+                document.getElementById('crmEditModal').classList.add('active');
+            } catch (e) { Swal.fire('שגיאה', e.message || 'טעינה נכשלה', 'error'); }
+        }
+        function renderCrmEditForm(d) {
+            var body = document.getElementById('crmEditBody');
+            var raw = (d.reports && d.reports[0] && d.reports[0].raw_data) ? d.reports[0].raw_data : {};
+            var ins = raw.raw_ins || [];
+            var fin = raw.raw_fin || [];
+            var mem = raw.members || {};
+            var memArr = [];
+            Object.keys(mem).forEach(function(n) {
+                var o = mem[n] || {};
+                memArr.push({ name: n, age: o.age || '', job: o.job || '', status: o.status || '' });
+            });
+            function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+            function insRow(i, row) {
+                var cells = _crmEditInsKeys.map(function(k) {
+                    return '<td><input type="text" data-tbl="ins" data-row="' + i + '" data-key="' + k + '" value="' + esc(row[k]) + '"></td>';
+                }).join('');
+                return '<tr>' + cells + '<td class="col-actions"><button type="button" class="btn btn-sm btn-outline-danger" onclick="crmEditRemoveRow(this,\'ins\')"><i class="fas fa-trash"></i></button></td></tr>';
+            }
+            function finRow(i, row) {
+                var cells = _crmEditFinKeys.map(function(k) {
+                    var v = row[k];
+                    if (typeof v === 'number') v = v.toString();
+                    return '<td><input type="text" data-tbl="fin" data-row="' + i + '" data-key="' + k + '" value="' + esc(v) + '"></td>';
+                }).join('');
+                return '<tr>' + cells + '<td class="col-actions"><button type="button" class="btn btn-sm btn-outline-danger" onclick="crmEditRemoveRow(this,\'fin\')"><i class="fas fa-trash"></i></button></td></tr>';
+            }
+            function memRow(i, row) {
+                return '<tr><td><input type="text" data-tbl="mem" data-row="' + i + '" data-key="name" value="' + esc(row.name) + '"></td>' +
+                    '<td><input type="text" data-tbl="mem" data-row="' + i + '" data-key="age" value="' + esc(row.age) + '"></td>' +
+                    '<td><input type="text" data-tbl="mem" data-row="' + i + '" data-key="job" value="' + esc(row.job) + '"></td>' +
+                    '<td><input type="text" data-tbl="mem" data-row="' + i + '" data-key="status" value="' + esc(row.status) + '"></td>' +
+                    '<td class="col-actions"><button type="button" class="btn btn-sm btn-outline-danger" onclick="crmEditRemoveRow(this,\'mem\')"><i class="fas fa-trash"></i></button></td></tr>';
+            }
+            var insHeaders = ['מבוטח','חברה','סוג','פוליסה','תחילה','כיסוי','פרמיה','הערות'].map(function(h){ return '<th>'+h+'</th>'; }).join('');
+            var finHeaders = ['חוסך','מוצר','חברה','צבירה','דמי ניהול','סיכון','צפי פרישה','סטטוס','המלצות'].map(function(h){ return '<th>'+h+'</th>'; }).join('');
+            var insRows = ins.map(function(row, i) { return insRow(i, row); }).join('');
+            var finRows = fin.map(function(row, i) { return finRow(i, row); }).join('');
+            var memRows = memArr.map(function(row, i) { return memRow(i, row); }).join('');
+            body.innerHTML =
+                '<div class="mb-3"><label class="form-label fw-bold">שם משפחה / לקוח</label><input type="text" class="form-control" id="crmEditFamilyName" value="' + esc(d.family_name || 'כללי') + '"></div>' +
+                '<div class="sec-title">תיק ביטוחי</div>' +
+                '<table class="editable-table" id="crmEditIns"><thead><tr>' + insHeaders + '<th class="col-actions"></th></tr></thead><tbody>' + insRows + '</tbody></table>' +
+                '<button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="crmEditAddRow(\'ins\')"><i class="fas fa-plus me-1"></i> הוסף שורה</button>' +
+                '<div class="sec-title">תיק פיננסי</div>' +
+                '<table class="editable-table" id="crmEditFin"><thead><tr>' + finHeaders + '<th class="col-actions"></th></tr></thead><tbody>' + finRows + '</tbody></table>' +
+                '<button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="crmEditAddRow(\'fin\')"><i class="fas fa-plus me-1"></i> הוסף שורה</button>' +
+                '<div class="sec-title">משתתפים</div>' +
+                '<table class="editable-table" id="crmEditMem"><thead><tr><th>שם</th><th>גיל</th><th>עיסוק</th><th>סטטוס</th><th class="col-actions"></th></tr></thead><tbody>' + memRows + '</tbody></table>' +
+                '<button type="button" class="btn btn-sm btn-outline-primary" onclick="crmEditAddRow(\'mem\')"><i class="fas fa-plus me-1"></i> הוסף משתתף</button>';
+        }
+        function crmEditAddRow(tbl) {
+            var tbody = document.getElementById('crmEdit' + (tbl === 'ins' ? 'Ins' : tbl === 'fin' ? 'Fin' : 'Mem')).querySelector('tbody');
+            var r = tbody.querySelectorAll('tr').length;
+            var tr = document.createElement('tr');
+            if (tbl === 'ins') {
+                _crmEditInsKeys.forEach(function(k) {
+                    var td = document.createElement('td');
+                    td.innerHTML = '<input type="text" data-tbl="ins" data-row="' + r + '" data-key="' + k + '" value="">';
+                    tr.appendChild(td);
+                });
+            } else if (tbl === 'fin') {
+                _crmEditFinKeys.forEach(function(k) {
+                    var td = document.createElement('td');
+                    td.innerHTML = '<input type="text" data-tbl="fin" data-row="' + r + '" data-key="' + k + '" value="">';
+                    tr.appendChild(td);
+                });
+            } else {
+                tr.innerHTML = '<td><input type="text" data-tbl="mem" data-row="' + r + '" data-key="name" value=""></td><td><input type="text" data-tbl="mem" data-row="' + r + '" data-key="age" value=""></td><td><input type="text" data-tbl="mem" data-row="' + r + '" data-key="job" value=""></td><td><input type="text" data-tbl="mem" data-row="' + r + '" data-key="status" value=""></td><td class="col-actions"><button type="button" class="btn btn-sm btn-outline-danger" onclick="crmEditRemoveRow(this,\'mem\')"><i class="fas fa-trash"></i></button></td>';
+            }
+            if (tbl === 'ins' || tbl === 'fin') {
+                var td = document.createElement('td');
+                td.className = 'col-actions';
+                td.innerHTML = '<button type="button" class="btn btn-sm btn-outline-danger" onclick="crmEditRemoveRow(this,\'' + tbl + '\')"><i class="fas fa-trash"></i></button>';
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+        function crmEditRemoveRow(btn, tbl) {
+            btn.closest('tr').remove();
+        }
+        function collectCrmEditData() {
+            var family = (document.getElementById('crmEditFamilyName') && document.getElementById('crmEditFamilyName').value || 'כללי').trim();
+            var raw_ins = [];
+            var raw_fin = [];
+            var members = {};
+            document.querySelectorAll('#crmEditBody input[data-tbl="ins"]').forEach(function(inp) {
+                var row = parseInt(inp.dataset.row, 10);
+                var k = inp.dataset.key;
+                if (!raw_ins[row]) raw_ins[row] = {};
+                raw_ins[row][k] = inp.value.trim();
+            });
+            raw_ins = raw_ins.filter(function(r) { return r && (r.client || r.type || r.company); });
+            document.querySelectorAll('#crmEditBody input[data-tbl="fin"]').forEach(function(inp) {
+                var row = parseInt(inp.dataset.row, 10);
+                var k = inp.dataset.key;
+                if (!raw_fin[row]) raw_fin[row] = {};
+                var v = inp.value.trim();
+                if ((k === 'balance' || k === 'simulation') && v && !isNaN(parseFloat(v))) raw_fin[row][k] = parseFloat(v);
+                else raw_fin[row][k] = v;
+            });
+            raw_fin = raw_fin.filter(function(r) { return r && (r.client || r.product || r.company); });
+            document.querySelectorAll('#crmEditBody input[data-tbl="mem"]').forEach(function(inp) {
+                var row = parseInt(inp.dataset.row, 10);
+                var k = inp.dataset.key;
+                if (!members['__' + row]) members['__' + row] = {};
+                members['__' + row][k] = inp.value.trim();
+            });
+            var memKeys = Object.keys(members).filter(function(k) { return /^__\d+$/.test(k); }).sort(function(a, b) { return parseInt(a.slice(2), 10) - parseInt(b.slice(2), 10); });
+            var memArr = memKeys.map(function(k) { return members[k]; }).filter(function(m) { return (m.name || '').trim(); });
+            members = {};
+            memArr.forEach(function(m) {
+                var n = (m.name || '').trim();
+                if (n) members[n] = { age: m.age || '', job: m.job || '', status: m.status || '' };
+            });
+            return { family_name: family, raw_data: { raw_ins: raw_ins, raw_fin: raw_fin, members: members } };
+        }
+        async function saveCrmEdit() {
+            if (!_crmEditDashboardId) return;
+            var payload = collectCrmEditData();
+            try {
+                var r = await fetch('/api/dashboards/' + encodeURIComponent(_crmEditDashboardId), {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ family_name: payload.family_name, raw_data: payload.raw_data })
+                });
+                if (r.status === 401) { window.location.href = '/login'; return; }
+                if (!r.ok) { var j = await r.json().catch(function() { return {}; }); Swal.fire('שגיאה', j.error || 'עדכון נכשל', 'error'); return; }
+                closeCrmEditModal();
+                loadSavedDashboards(renderFamilies);
+                if (typeof v360Toast === 'function') v360Toast('התיק עודכן בהצלחה'); else Swal.fire('נשמר', 'התיק עודכן.', 'success');
+            } catch (e) { Swal.fire('שגיאה', e.message || 'עדכון נכשל', 'error'); }
+        }
+        document.getElementById('crmEditSave').addEventListener('click', saveCrmEdit);
+        function openDashboardAsClient(d) {
+            var family = (d.family_name || 'כללי').trim();
+            var raw = (d.reports && d.reports[0] && d.reports[0].raw_data) ? d.reports[0].raw_data : {};
+            var raw_ins = raw.raw_ins || [], raw_fin = raw.raw_fin || [], membersData = raw.members || {};
+            Families[family] = { members: {}, rawFiles: [] };
+            var mem = Families[family].members;
+            function pNum(v) { return parseFloat((v||0).toString().replace(/[^\d.-]/g,''))||0; }
+            raw_ins.forEach(function(r) {
+                var name = (r.client||'').trim();
+                if (!name) return;
+                if (!mem[name]) mem[name] = { ins: [], fin: [], details: {} };
+                mem[name].ins.push({ type: r.type||'', co: r.company||'', cost: pNum(r.premium), cov: pNum(r.coverage), note: r.notes||'' });
+            });
+            raw_fin.forEach(function(r) {
+                var name = (r.client||'').trim();
+                if (!name) return;
+                if (!mem[name]) mem[name] = { ins: [], fin: [], details: {} };
+                mem[name].fin.push({ prod: r.product||'', co: r.company||'', bal: pNum(r.balance), fee: r.fee||'', rec: r.rec||'' });
+            });
+            Object.keys(membersData).forEach(function(n) {
+                var name = (n||'').trim();
+                if (!name) return;
+                if (!mem[name]) mem[name] = { ins: [], fin: [], details: {} };
+                var o = membersData[n]||{};
+                mem[name].details = { age: o.age, job: o.job, status: o.status };
+            });
+            loadFamily(family);
+        }
         function renderFamilies() {
-            const q = document.getElementById('searchBox').value.toLowerCase();
-            const grid = document.getElementById('families-grid');
+            var q = (document.getElementById('searchBox') && document.getElementById('searchBox').value || '').toLowerCase();
+            var grid = document.getElementById('families-grid');
+            if (!grid) return;
             grid.innerHTML = '';
 
-            Object.keys(Families).filter(k => k.toLowerCase().includes(q)).forEach(fName => {
-                const fam = Families[fName];
-                const members = Object.keys(fam.members);
-                
-                let fPrem=0, fSav=0;
-                members.forEach(m => {
-                    fPrem += fam.members[m].ins.reduce((s,i)=>s+i.cost,0);
-                    fSav += fam.members[m].fin.reduce((s,i)=>s+i.bal,0);
+            Object.keys(Families).filter(function(k) { return k.toLowerCase().indexOf(q) >= 0; }).forEach(function(fName) {
+                var fam = Families[fName];
+                var members = Object.keys(fam.members);
+                var fPrem = 0, fSav = 0;
+                members.forEach(function(m) {
+                    fPrem += fam.members[m].ins.reduce(function(s,x){ return s + x.cost; }, 0);
+                    fSav += fam.members[m].fin.reduce(function(s,x){ return s + x.bal; }, 0);
                 });
-
-                const div = document.createElement('div');
+                var div = document.createElement('div');
                 div.className = 'col-md-4';
-                div.innerHTML = `
-                    <div class="card-box family-card">
-                        <div class="d-flex justify-content-between mb-3">
-                            <h4 class="fw-bold m-0 text-primary" style="cursor: pointer;" onclick="loadFamily('${fName}')">${fName}</h4>
-                            <div class="d-flex gap-2 align-items-center">
-                                <i class="fas fa-cube cube-icon" onclick="event.stopPropagation(); showParticipants('${fName}')" title="צפה במבוטחים"></i>
-                                <i class="fas fa-users text-muted"></i>
-                            </div>
-                        </div>
-                        <div class="mb-3 text-muted small" onclick="loadFamily('${fName}')" style="cursor: pointer;">
-                            ${members.join(', ')}
-                        </div>
-                        <div class="row text-center mt-3 pt-3 border-top" onclick="loadFamily('${fName}')" style="cursor: pointer;">
-                            <div class="col">
-                                <div class="stat-label">פרמיה</div>
-                                <div class="fw-bold">₪${fPrem.toLocaleString()}</div>
-                            </div>
-                            <div class="col">
-                                <div class="stat-label">נכסים</div>
-                                <div class="fw-bold text-success">₪${fSav.toLocaleString()}</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                var esc = fName.replace(/'/g, "\\'");
+                div.innerHTML = '<div class="card-box family-card">' +
+                    '<div class="d-flex justify-content-between mb-3">' +
+                    '<h4 class="fw-bold m-0 text-primary" style="cursor:pointer" onclick="loadFamily(\'' + esc + '\')">' + fName + '</h4>' +
+                    '<div class="d-flex gap-2 align-items-center">' +
+                    '<i class="fas fa-cube cube-icon" onclick="event.stopPropagation(); showParticipants(\'' + esc + '\')" title="צפה במבוטחים"></i>' +
+                    '<i class="fas fa-trash text-danger" style="cursor:pointer" onclick="event.stopPropagation(); deleteFamily(\'' + esc + '\')" title="מחק תיק"></i>' +
+                    '<i class="fas fa-users text-muted"></i></div></div>' +
+                    '<div class="mb-3 text-muted small" onclick="loadFamily(\'' + esc + '\')" style="cursor:pointer">' + members.join(', ') + '</div>' +
+                    '<div class="row text-center mt-3 pt-3 border-top" onclick="loadFamily(\'' + esc + '\')" style="cursor:pointer">' +
+                    '<div class="col"><div class="stat-label">פרמיה</div><div class="fw-bold">₪' + fPrem.toLocaleString() + '</div></div>' +
+                    '<div class="col"><div class="stat-label">נכסים</div><div class="fw-bold text-success">₪' + fSav.toLocaleString() + '</div></div></div></div>';
+                grid.appendChild(div);
+            });
+
+            savedDashboards.filter(function(d) {
+                var fn = (d.family_name || 'כללי').trim();
+                return fn.toLowerCase().indexOf(q) >= 0;
+            }).forEach(function(d) {
+                var fn = (d.family_name || 'כללי').trim();
+                var id = d.id || '';
+                var crmKey = d.crm_key || d.id || '—';
+                var dat = d.created_at ? new Date(d.created_at).toLocaleDateString('he-IL') : '';
+                var div = document.createElement('div');
+                div.className = 'col-md-4';
+                var escId = (d.id || '').replace(/'/g, "\\'");
+                div.innerHTML = '<div class="card-box family-card border-primary border-2">' +
+                    '<span class="badge bg-primary mb-2">נשמר מ-360</span> ' +
+                    '<code class="small text-muted" title="מפתח CRM">' + crmKey + '</code>' +
+                    '<h4 class="fw-bold m-0 text-primary mt-2">' + fn + '</h4>' +
+                    '<p class="text-muted small mb-2">' + dat + '</p>' +
+                    '<div class="d-flex flex-wrap gap-2 mt-3">' +
+                    '<button type="button" class="btn btn-sm btn-primary" onclick="openDashboard360(\'' + escId + '\')"><i class="fas fa-chart-line me-1"></i> פתח דשבורד</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary" onclick="openDashboardAsClientById(\'' + escId + '\')"><i class="fas fa-user me-1"></i> פתח כלקוח</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="openEditCrmModal(\'' + escId + '\')"><i class="fas fa-edit me-1"></i> ערוך</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteDashboard360(\'' + escId + '\')"><i class="fas fa-trash me-1"></i> מחק</button></div></div>';
                 grid.appendChild(div);
             });
         }
@@ -753,6 +1543,12 @@
             window.print();
         }
 
+        if (window._pendingCrmFamily) {
+            var fam = window._pendingCrmFamily;
+            delete window._pendingCrmFamily;
+            initMainChart();
+            loadFamily(fam);
+        }
     </script>
 </body>
 </html>

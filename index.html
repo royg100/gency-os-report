@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
         :root {
@@ -43,12 +44,38 @@
         .top-admin-link:hover { background: rgba(255,255,255,0.2); color: white; }
         .btn-pdf { background: var(--success) !important; font-weight: 600; }
         .btn-pdf:hover { background: #059669 !important; }
+        .btn-save-crm:hover { background: #059669 !important; }
         .btn-print { background: var(--primary) !important; font-weight: 600; }
         
         .tabs-container { background: var(--white); padding: 0 20px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 5px; overflow-x: auto; }
         .tab-btn { padding: 15px 25px; background: transparent; border: none; border-bottom: 3px solid transparent; font-weight: 600; color: var(--gray); cursor: pointer; white-space: nowrap; }
         .tab-btn:hover { color: var(--primary); background: #f8fafc; }
         .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: #fff0f7; }
+        
+        /* דוח תובנות והמלצות טיפול */
+        .insights-report { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); direction: rtl; text-align: right; }
+        .insights-report .ir-header { text-align: center; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 3px solid #0284c7; }
+        .insights-report .ir-header i { font-size: 2.5rem; color: #0284c7; margin-bottom: 10px; display: block; }
+        .insights-report .ir-header h1 { margin: 0; font-size: 1.8rem; font-weight: 800; color: #0c4a6e; }
+        .insights-report .ir-meta { color: #64748b; margin-top: 10px; font-size: 1.05rem; }
+        .insights-report .ir-section { margin-bottom: 28px; }
+        .insights-report .ir-section h2 { font-size: 1.25rem; color: #0c4a6e; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #e0f2fe; }
+        .insights-report .ir-section ul { margin: 0; padding-right: 24px; line-height: 1.85; color: #334155; }
+        .insights-report .ir-sev { font-size: 0.8rem; padding: 2px 8px; border-radius: 6px; margin-right: 6px; }
+        .insights-report .ir-sev.sev-important { background: #fef3c7; color: #92400e; }
+        .insights-report .ir-sev.sev-review { background: #e0f2fe; color: #0369a1; }
+        .insights-report .ir-rec { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+        .insights-report .ir-rec h3 { margin: 0 0 10px 0; font-size: 1.1rem; color: #0c4a6e; }
+        .insights-report .ir-rec-text { margin: 0 0 8px 0; color: #166534; line-height: 1.6; }
+        .insights-report .ir-rec-bg { margin: 0; color: #64748b; font-size: 0.9rem; }
+        .insights-report .ir-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 20px; }
+        .insights-report .ir-table th, .insights-report .ir-table td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
+        .insights-report .ir-table th { background: #f1f5f9; color: #1e293b; font-weight: 700; }
+        .insights-report .ir-appendix h3 { font-size: 1rem; margin: 16px 0 10px 0; color: #475569; }
+        .insights-report .ir-empty { text-align: center; padding: 50px 20px; color: #166534; }
+        .insights-report .ir-empty i { font-size: 4rem; margin-bottom: 20px; display: block; color: #10b981; }
+        .insights-report .ir-empty h2 { font-size: 1.5rem; margin-bottom: 12px; }
+        .insights-report .ir-empty p { color: #64748b; font-size: 1.05rem; }
         
         /* Toast Notifications */
         .toast-container {
@@ -347,7 +374,10 @@
 
     <div id="uploadView">
         <div class="upload-container">
-            <a href="/admin" id="adminLinkUpload" class="upload-admin-link" style="display: none;"><i class="fas fa-cog"></i> ניהול</a>
+            <div style="position: absolute; top: 20px; left: 20px; display: flex; gap: 8px;">
+                <a href="/" class="upload-admin-link" style="position: static;"><i class="fas fa-users-cog"></i> מרכז לקוחות</a>
+                <a href="/admin" id="adminLinkUpload" class="upload-admin-link" style="display: none; position: static;"><i class="fas fa-cog"></i> ניהול</a>
+            </div>
             <div class="logo"><i class="fas fa-layer-group"></i></div>
             <h1>מבט 360</h1>
             <p>גרור את כל קבצי האקסל והדאט לכאן</p>
@@ -375,11 +405,14 @@
         <div class="top-bar">
             <div class="app-brand"><i class="fas fa-layer-group"></i> AgencyOS 360</div>
             <div class="top-actions">
+                <a href="/" class="top-admin-link"><i class="fas fa-users-cog"></i> מרכז לקוחות</a>
                 <a href="/admin" id="adminLinkWrap" class="top-admin-link" style="display: none;"><i class="fas fa-cog"></i> ניהול</a>
+                <button class="btn-save-crm" onclick="saveToCrm()" aria-label="שמור ל-CRM" style="background: #10b981 !important; font-weight: 600;"><i class="fas fa-save"></i> שמור ל-CRM</button>
                 <button class="btn-add-files" onclick="showAddFilesDialog()" aria-label="הוסף עוד קבצים" style="background: #3b82f6 !important; font-weight: 600;"><i class="fas fa-plus-circle"></i> הוסף קבצים</button>
                 <button class="btn-pdf" onclick="downloadActiveReport()" aria-label="הורד דוח PDF של הדוח הנוכחי"><i class="fas fa-file-download"></i> הורד PDF מלא</button>
                 <button class="btn-excel" onclick="exportToExcel()" aria-label="ייצא ל-Excel" style="background: #10b981 !important; font-weight: 600;"><i class="fas fa-file-excel"></i> ייצוא Excel</button>
                 <button class="btn-print" onclick="printActiveReport()" aria-label="הדפס את הדוח הנוכחי"><i class="fas fa-print"></i> הדפסה</button>
+                <button class="btn-insights" onclick="printInsightsReport()" aria-label="הפק דוח תובנות והמלצות טיפול" style="background: #0284c7 !important; font-weight: 600;"><i class="fas fa-lightbulb"></i> הפק דוח תובנות</button>
                 <button onclick="location.reload()" aria-label="טען מחדש את הדף"><i class="fas fa-sync"></i> חדש</button>
             </div>
         </div>
@@ -687,6 +720,7 @@
                                     if (rr.ok) {
                                         const j = await rr.json();
                                         if (j.html) ex.html = j.html;
+                                        if (j.insights_report) ex.insights_report = j.insights_report;
                                     }
                                 } catch (e) { console.warn('render_report failed', e); }
                             }
@@ -730,6 +764,53 @@
             // פתיחת דיאלוג בחירת קבצים
             fileInput.click();
             // הקבצים יתווספו לרשימה דרך ה-event listener הקיים
+        }
+
+        async function saveToCrm() {
+            if (!reportsData || !reportsData.length) {
+                showToast('error', 'שגיאה', 'אין דשבורד לשמירה');
+                return;
+            }
+            const r = reportsData[0];
+            const defaultName = (r.family || r.family_name || 'כללי').trim();
+            const swalResult = await Swal.fire({
+                title: 'שמור ל-CRM',
+                text: 'מה שם הלקוח לתצוגה?',
+                input: 'text',
+                inputValue: defaultName,
+                inputPlaceholder: 'שם המשפחה / הלקוח',
+                showCancelButton: true,
+                confirmButtonText: 'שמור',
+                cancelButtonText: 'ביטול'
+            });
+            if (!swalResult.isConfirmed) return;
+            const familyName = (swalResult.value || '').trim() || defaultName;
+            const payload = {
+                family_name: familyName,
+                raw_data: r.raw_data || { raw_ins: [], raw_fin: [], members: {} },
+                html: r.html || '',
+                insights_report: r.insights_report || {}
+            };
+            try {
+                const res = await fetch('/api/dashboards', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                if (!res.ok) {
+                    const j = await res.json().catch(() => ({}));
+                    showToast('warning', 'שמירה ל-CRM', (j.error || res.statusText) + ' – נסה שוב.');
+                    return;
+                }
+                showToast('success', 'נשמר ל-CRM', 'הדשבורד נשמר בהצלחה.');
+            } catch (e) {
+                showToast('error', 'שמירה ל-CRM', e.message || 'שגיאה בשמירה.');
+            }
         }
 
         // Toast Notification System
@@ -783,6 +864,67 @@
             setTimeout(() => updateProgress(0), 300);
         }
 
+        function buildInsightsReportHtml(ir, family, reportIndex) {
+            const fam = family || 'כללי';
+            const date = new Date().toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric' });
+            let h = '<div class="insights-report" data-report-index="' + reportIndex + '">';
+            h += '<div class="ir-header">';
+            h += '<i class="fas fa-lightbulb"></i>';
+            h += '<h1>דוח תובנות והמלצות טיפול</h1>';
+            h += '<p class="ir-meta">' + fam + ' | תאריך הפקה: ' + date + '</p>';
+            h += '</div>';
+            const sum = (ir.executive_summary || '').trim();
+            if (sum) {
+                h += '<section class="ir-section ir-summary"><h2>סיכום תמציתי</h2><p>' + sum + '</p></section>';
+            }
+            const insights = ir.insights || [];
+            if (insights.length > 0) {
+                h += '<section class="ir-section ir-insights"><h2>תובנות</h2><ul>';
+                insights.forEach(function(i) {
+                    const sev = i.severity ? ' <span class="ir-sev ' + (i.severity === 'חשוב' ? 'sev-important' : 'sev-review') + '">' + i.severity + '</span>' : '';
+                    h += '<li><strong>' + (i.client || '') + '</strong>' + sev + ': ' + (i.text || '') + '</li>';
+                });
+                h += '</ul></section>';
+            }
+            const recs = ir.recommendations || [];
+            if (recs.length > 0) {
+                h += '<section class="ir-section ir-recommendations"><h2>המלצות טיפול</h2>';
+                recs.forEach(function(r) {
+                    h += '<div class="ir-rec">';
+                    h += '<h3>' + (r.title || '') + (r.client ? ' – ' + r.client : '') + '</h3>';
+                    h += '<p class="ir-rec-text">' + (r.recommendation || '') + '</p>';
+                    if (r.background) h += '<p class="ir-rec-bg"><small>רקע: ' + r.background + '</small></p>';
+                    h += '</div>';
+                });
+                h += '</section>';
+            }
+            const appIns = ir.appendix_ins || [];
+            const appFin = ir.appendix_fin || [];
+            if (appIns.length > 0 || appFin.length > 0) {
+                h += '<section class="ir-section ir-appendix"><h2>נספח – טבלאות מקוצר</h2>';
+                if (appIns.length > 0) {
+                    h += '<h3>תיק ביטוחי</h3><table class="ir-table"><thead><tr><th>מבוטח</th><th>סוג</th><th>כיסוי</th><th>פרמיה</th></tr></thead><tbody>';
+                    appIns.slice(0, 30).forEach(function(r) {
+                        h += '<tr><td>' + (r.client || '') + '</td><td>' + (r.type || '') + '</td><td>' + (r.coverage != null ? '₪' + Number(r.coverage).toLocaleString() : '-') + '</td><td>' + (r.premium != null ? '₪' + Number(r.premium).toLocaleString() : '-') + '</td></tr>';
+                    });
+                    h += '</tbody></table>';
+                }
+                if (appFin.length > 0) {
+                    h += '<h3>תיק פיננסי</h3><table class="ir-table"><thead><tr><th>חוסך</th><th>מוצר</th><th>צבירה</th><th>דמי ניהול</th></tr></thead><tbody>';
+                    appFin.slice(0, 30).forEach(function(r) {
+                        h += '<tr><td>' + (r.client || '') + '</td><td>' + (r.product || '') + '</td><td>' + (r.balance != null ? '₪' + Number(r.balance).toLocaleString() : '-') + '</td><td>' + (r.fee || '-') + '</td></tr>';
+                    });
+                    h += '</tbody></table>';
+                }
+                h += '</section>';
+            }
+            if (!sum && insights.length === 0 && recs.length === 0) {
+                h += '<div class="ir-empty"><i class="fas fa-check-circle"></i><h2>כל המוצרים הנדרשים קיימים!</h2><p>אין המלצות נוספות בשלב זה.</p></div>';
+            }
+            h += '</div>';
+            return h;
+        }
+
         function initDashboard(data) {
             uploadView.style.display = 'none'; 
             dashboardView.style.display = 'flex';
@@ -811,11 +953,11 @@
                 };
                 tabsContainer.appendChild(tab);
 
-                // טאב 2: המלצות
+                // טאב 2: דוח תובנות והמלצות טיפול
                 const recTab = document.createElement('button');
                 recTab.className = 'tab-btn';
-                recTab.innerHTML = `<i class="fas fa-lightbulb" style="margin-left:5px;"></i> המלצות`;
-                recTab.setAttribute('aria-label', `המלצות עבור ${report.family || reportIndex + 1}`);
+                recTab.innerHTML = `<i class="fas fa-lightbulb" style="margin-left:5px;"></i> דוח תובנות`;
+                recTab.setAttribute('aria-label', `דוח תובנות והמלצות טיפול עבור ${report.family || reportIndex + 1}`);
                 recTab.setAttribute('role', 'tab');
                 recTab.setAttribute('aria-selected', 'false');
                 recTab.onclick = () => switchTab(tabIndex + 1);
@@ -843,53 +985,20 @@
                     delete iframe.dataset.html;
                 }
 
-                // יצירת div להמלצות
+                // יצירת div להמלצות / דוח תובנות והמלצות טיפול
                 const recDiv = document.createElement('div');
                 recDiv.id = `recommendations-${tabIndex + 1}`;
-                recDiv.className = 'recommendations-container';
+                recDiv.className = 'recommendations-container insights-report-container';
                 recDiv.style.display = 'none';
                 recDiv.style.padding = '20px';
                 recDiv.style.overflowY = 'auto';
                 recDiv.style.height = '100%';
                 recDiv.style.background = '#f1f5f9';
+                recDiv.dataset.reportIndex = String(reportIndex);
                 contentArea.appendChild(recDiv);
                 
-                // יצירת תוכן המלצות
-                if (report.recommendations && report.recommendations.length > 0) {
-                    let recHtml = '<div style="max-width:900px; margin:0 auto; background:white; padding:30px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">';
-                    recHtml += '<div style="text-align:center; margin-bottom:30px; padding-bottom:20px; border-bottom:3px solid #0284c7;">';
-                    recHtml += '<i class="fas fa-lightbulb" style="font-size:2.5rem; color:#0284c7; margin-bottom:10px;"></i>';
-                    recHtml += `<h2 style="color:#0c4a6e; margin:0; font-size:1.8rem; font-weight:800;">המלצות מותאמות אישית</h2>`;
-                    recHtml += `<p style="color:#64748b; margin-top:10px; font-size:1.1rem;">${report.family || 'לקוח'}</p>`;
-                    recHtml += '</div>';
-                    
-                    report.recommendations.forEach((rec, idx) => {
-                        recHtml += `<div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; padding:25px; margin-bottom:25px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">`;
-                        recHtml += `<div style="display:flex; align-items:center; gap:12px; margin-bottom:18px; padding-bottom:15px; border-bottom:2px solid #e0f2fe;">`;
-                        recHtml += `<i class="fas fa-user-circle" style="color:#0284c7; font-size:1.5rem;"></i>`;
-                        recHtml += `<strong style="color:#0c4a6e; font-size:1.2rem; font-weight:700;">${rec.client}</strong>`;
-                        recHtml += `</div>`;
-                        recHtml += `<div style="background:white; padding:18px; border-radius:8px; margin-bottom:18px; border:1px solid #e0f2fe;">`;
-                        recHtml += `<div style="font-size:1rem; color:#64748b; margin-bottom:12px; font-weight:600;"><i class="fas fa-exclamation-circle" style="color:#f59e0b; margin-left:8px;"></i> מוצרים שחסרים:</div>`;
-                        recHtml += `<div style="display:flex; flex-wrap:wrap; gap:10px;">`;
-                        rec.missing_items.forEach(item => {
-                            recHtml += `<span style="background:#fef3c7; color:#92400e; padding:8px 14px; border-radius:8px; font-size:0.9rem; font-weight:700; border:1px solid #fcd34d;">${item}</span>`;
-                        });
-                        recHtml += `</div></div>`;
-                        recHtml += `<div style="background:#ecfdf5; border-right:4px solid #10b981; padding:18px; border-radius:8px;">`;
-                        recHtml += `<div style="font-size:1rem; color:#166534; font-weight:700; margin-bottom:12px;"><i class="fas fa-check-circle" style="color:#10b981; margin-left:8px;"></i> המלצות:</div>`;
-                        recHtml += `<ul style="margin:0; padding-right:25px; font-size:0.95rem; color:#166534; line-height:1.8;">`;
-                        rec.recommendations.forEach(recText => {
-                            recHtml += `<li style="margin-bottom:10px; padding-right:5px;">${recText}</li>`;
-                        });
-                        recHtml += `</ul></div></div>`;
-                    });
-                    
-                    recHtml += '</div>';
-                    recDiv.innerHTML = recHtml;
-                } else {
-                    recDiv.innerHTML = '<div style="max-width:800px; margin:50px auto; background:white; padding:50px; border-radius:12px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.1);"><i class="fas fa-check-circle" style="font-size:4rem; color:#10b981; margin-bottom:25px;"></i><h2 style="color:#166534; font-size:1.8rem; margin-bottom:15px;">כל המוצרים הנדרשים קיימים!</h2><p style="color:#64748b; font-size:1.1rem; margin-top:10px;">אין המלצות נוספות בשלב זה.</p></div>';
-                }
+                const ir = report.insights_report;
+                recDiv.innerHTML = buildInsightsReportHtml(ir || {}, report.family || 'כללי', reportIndex);
             });
             activeReportIndex = 0;
         }
@@ -1075,8 +1184,32 @@
         }
 
         function printActiveReport() {
+            if (activeReportIndex % 2 === 1) {
+                const recDiv = document.getElementById(`recommendations-${activeReportIndex}`);
+                if (recDiv) {
+                    const w = window.open('', '_blank');
+                    w.document.write('<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>דוח תובנות והמלצות טיפול</title><link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"><style>body{font-family:Assistant,sans-serif;margin:20px;direction:rtl;text-align:right}.insights-report{max-width:800px;margin:0 auto}.ir-header{text-align:center;border-bottom:3px solid #0284c7;padding-bottom:15px;margin-bottom:20px}.ir-header i{font-size:2rem;color:#0284c7;display:block;margin-bottom:8px}.ir-section{margin-bottom:24px;page-break-inside:avoid}.ir-section h2{font-size:1.2rem;color:#0c4a6e;margin-bottom:12px}.ir-table{width:100%;border-collapse:collapse;font-size:0.9rem;margin-bottom:16px}.ir-table th,.ir-table td{border:1px solid #ddd;padding:8px;text-align:right}.ir-table th{background:#f1f5f9}@media print{body{margin:0;padding:15mm}}</style></head><body>' + recDiv.querySelector('.insights-report')?.outerHTML || recDiv.innerHTML + '</body></html>');
+                    w.document.close();
+                    w.focus();
+                    setTimeout(function() { w.print(); w.close(); }, 600);
+                }
+                return;
+            }
             const activeFrame = document.getElementById(`report-frame-${activeReportIndex}`);
             if (activeFrame) activeFrame.contentWindow.print();
+        }
+
+        function printInsightsReport() {
+            const reportIndex = Math.floor(activeReportIndex / 2);
+            const report = typeof reportsData !== 'undefined' && reportsData[reportIndex];
+            const ir = report && report.insights_report;
+            const family = report ? (report.family || 'כללי') : 'כללי';
+            const html = buildInsightsReportHtml(ir || {}, family, reportIndex);
+            const w = window.open('', '_blank');
+            w.document.write('<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>דוח תובנות והמלצות טיפול – ' + family + '</title><link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"><style>body{font-family:Assistant,sans-serif;margin:20px;direction:rtl;text-align:right;background:#fff}.insights-report{max-width:800px;margin:0 auto}.ir-header{text-align:center;border-bottom:3px solid #0284c7;padding-bottom:15px;margin-bottom:20px}.ir-header i{font-size:2rem;color:#0284c7;display:block;margin-bottom:8px}.ir-section{margin-bottom:24px;page-break-inside:avoid}.ir-section h2{font-size:1.2rem;color:#0c4a6e;margin-bottom:12px}.ir-table{width:100%;border-collapse:collapse;font-size:0.9rem;margin-bottom:16px}.ir-table th,.ir-table td{border:1px solid #ddd;padding:8px;text-align:right}.ir-table th{background:#f1f5f9}.ir-empty{text-align:center;padding:40px 20px}@media print{body{margin:0;padding:15mm}}</style></head><body>' + html + '</body></html>');
+            w.document.close();
+            w.focus();
+            setTimeout(function() { w.print(); }, 600);
         }
 
         // ייצוא ל-Excel
@@ -1145,15 +1278,16 @@
         }
 
         function downloadActiveReport() {
-    const activeFrame = document.getElementById(`report-frame-${activeReportIndex}`);
-    if (!activeFrame) {
-        showToast('error', 'שגיאה', 'לא נמצא דוח לייצוא');
-        return;
-    }
+            const reportIndex = Math.floor(activeReportIndex / 2);
+            const frameIndex = reportIndex * 2;
+            const activeFrame = document.getElementById(`report-frame-${frameIndex}`);
+            if (!activeFrame) {
+                showToast('error', 'שגיאה', 'לא נמצא דוח לייצוא');
+                return;
+            }
 
-    // שליפת שם המשפחה לשם הקובץ
-    const reports = typeof reportsData !== 'undefined' ? reportsData : [];
-    const familyName = (reports[activeReportIndex] && reports[activeReportIndex].family) || "דוח";
+            const reports = typeof reportsData !== 'undefined' ? reportsData : [];
+            const familyName = (reports[reportIndex] && reports[reportIndex].family) || "דוח";
     
     const btn = document.querySelector('.btn-pdf');
     const originalText = btn.innerHTML;
@@ -1411,8 +1545,32 @@
                 btn.disabled = false;
             });
         }, 500); // השהייה קצרה לטעינת התמונות
-    }, 2500); // השהייה כדי שהגרפים יסיימו את האנימציה (2 שניות + 0.5 שניות)
+        }, 2500); // השהייה כדי שהגרפים יסיימו את האנימציה (2 שניות + 0.5 שניות)
 }
+
+        async function tryLoadDashboardFromQuery() {
+            const params = new URLSearchParams(location.search);
+            const id = params.get('dashboard_id');
+            if (!id) return;
+            loader.style.display = 'block';
+            try {
+                const r = await fetch('/api/dashboards/' + encodeURIComponent(id), { credentials: 'include' });
+                if (r.status === 401) { window.location.href = '/login'; return; }
+                if (!r.ok) { showToast('error', 'שגיאה', 'דשבורד לא נמצא'); loader.style.display = 'none'; return; }
+                const d = await r.json();
+                const reports = (d.reports || []).map(function (x) {
+                    return { family: x.family || d.family_name || 'כללי', html: x.html || '', raw_data: x.raw_data || {}, insights_report: x.insights_report || {} };
+                });
+                if (!reports.length) { showToast('warning', 'אזהרה', 'אין דוחות בדשבורד'); loader.style.display = 'none'; return; }
+                reportsData = reports;
+                initDashboard(reports);
+            } catch (e) {
+                showToast('error', 'שגיאה', (e.message || 'טעינת דשבורד נכשלה'));
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+        tryLoadDashboardFromQuery();
     </script>
 </body>
 </html>

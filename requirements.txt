@@ -1,6 +1,10 @@
 flask
 flask-cors
+flask-login
+flask-limiter
 pandas
 openpyxl
 xlrd
 gunicorn
+bcrypt
+werkzeug

@@ -23,6 +23,7 @@
         .tab.active { background: var(--primary); color: white; }
         .panel { display: none; padding: 24px; max-width: 1000px; margin: 0 auto; }
         .panel.active { display: block; }
+        #panel-productions { max-width: 1200px; }
         .card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); margin-bottom: 24px; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px 16px; text-align: right; border-bottom: 1px solid #e2e8f0; }
@@ -35,6 +36,8 @@
         .btn-edit:hover { background: #2563eb; }
         .btn-del { background: #ef4444; color: white; }
         .btn-del:hover { background: #dc2626; }
+        .btn-perms { background: #8b5cf6; color: white; }
+        .btn-perms:hover { background: #7c3aed; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
         .filter-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
@@ -54,6 +57,16 @@
         .toast.err { background: #dc2626; }
         .toast.ok { background: #10b981; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .file-names-wrap { max-width: 320px; max-height: 120px; overflow-y: auto; overflow-x: hidden; font-size: 0.85rem; color: var(--gray); }
+        .file-names-wrap::-webkit-scrollbar { width: 6px; }
+        .file-names-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
+        .file-names-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .file-name-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-name-item:last-child { border-bottom: none; }
+        .file-name-item i { color: var(--primary); flex-shrink: 0; }
+        .permission-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .permission-item:last-child { border-bottom: none; }
+        .permission-item input[type="checkbox"] { width: 18px; height: 18px; }
     </style>
 </head>
 <body>
@@ -68,6 +81,7 @@
     <div class="tabs">
         <button type="button" class="tab active" data-tab="users">ניהול משתמשים</button>
         <button type="button" class="tab" data-tab="productions">הפקות אחרונות</button>
+        <button type="button" class="tab" data-tab="sessions">מחוברים כעת</button>
     </div>
 
     <div id="panel-users" class="panel active">
@@ -104,13 +118,29 @@
                     <button type="button" class="btn btn-edit" id="btnRefreshProd"><i class="fas fa-sync"></i> רענן</button>
                 </div>
             </div>
-            <div id="productionsTableWrap">
-                <table>
-                    <thead><tr><th>משתמש</th><th>תאריך</th><th>דוח</th><th>קבצים</th></tr></thead>
+            <div id="productionsTableWrap" style="overflow-x: auto;">
+                <table style="min-width: 800px;">
+                    <thead><tr><th>משתמש</th><th>תאריך</th><th>דוח</th><th>קבצים</th><th>שמות קבצים</th></tr></thead>
                     <tbody id="productionsBody"></tbody>
                 </table>
             </div>
             <div id="productionsEmpty" class="empty-msg" style="display:none;">אין הפקות.</div>
+        </div>
+    </div>
+
+    <div id="panel-sessions" class="panel">
+        <div class="card">
+            <div class="toolbar">
+                <h2 style="margin:0;"><i class="fas fa-user-clock"></i> מחוברים כעת</h2>
+                <button type="button" class="btn btn-edit" id="btnRefreshSessions"><i class="fas fa-sync"></i> רענן</button>
+            </div>
+            <div id="sessionsTableWrap" style="overflow-x: auto;">
+                <table style="min-width: 500px;">
+                    <thead><tr><th>משתמש</th><th>התחבר ב־</th><th>פעילות אחרונה</th></tr></thead>
+                    <tbody id="sessionsBody"></tbody>
+                </table>
+            </div>
+            <div id="sessionsEmpty" class="empty-msg" style="display:none;">אין משתמשים מחוברים.</div>
         </div>
     </div>
 
@@ -129,6 +159,18 @@
             <div class="modal-actions">
                 <button type="button" class="btn btn-edit" id="modalUserSave">שמור</button>
                 <button type="button" class="btn" style="background:#e2e8f0; color:#475569;" id="modalUserCancel">ביטול</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalPermissions" class="modal-overlay">
+        <div class="modal" style="max-width: 480px;">
+            <h3 id="modalPermissionsTitle">הרשאות משתמש</h3>
+            <input type="hidden" id="modalPermissionsUserId" value="">
+            <div id="modalPermissionsCheckboxes"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-edit" id="modalPermissionsSave">שמור הרשאות</button>
+                <button type="button" class="btn" style="background:#e2e8f0; color:#475569;" id="modalPermissionsCancel">ביטול</button>
             </div>
         </div>
     </div>
@@ -165,6 +207,7 @@
             document.querySelectorAll('.panel').forEach(function(p) { p.classList.toggle('active', p.id === 'panel-' + name); });
             if (name === 'users') loadUsers();
             if (name === 'productions') loadProductions();
+            if (name === 'sessions') loadSessions();
         }
 
         document.querySelectorAll('.tab').forEach(function(t) {
@@ -172,7 +215,7 @@
         });
 
         function loadUsers() {
-            api('/admin/users').then(function(x) {
+            return api('/admin/users').then(function(x) {
                 if (!x.ok) { toast(x.json && x.json.error ? x.json.error : 'שגיאה בטעינת משתמשים', true); return; }
                 users = x.json || [];
                 var tbody = document.getElementById('usersBody');
@@ -189,6 +232,7 @@
                         '<td>' + (u.created_at ? new Date(u.created_at).toLocaleString('he-IL') : '—') + '</td>' +
                         '<td>' +
                             (isAdmin ? '' : '<button type="button" class="btn btn-edit btn-edit-user" data-id="' + u.id + '" data-username="' + (u.username || '') + '">ערוך סיסמה</button>') +
+                            (isAdmin ? '' : ' <button type="button" class="btn btn-perms btn-perms-user" data-id="' + u.id + '" data-username="' + (u.username || '') + '" data-permissions="' + (typeof u.permissions !== 'undefined' ? JSON.stringify(u.permissions || []).replace(/"/g, '&quot;') : '[]') + '">הרשאות</button>') +
                             (isAdmin ? '' : ' <button type="button" class="btn btn-del btn-del-user" data-id="' + u.id + '" data-username="' + (u.username || '') + '">מחק</button>') +
                         '</td>';
                     tbody.appendChild(tr);
@@ -196,8 +240,41 @@
                 tbody.querySelectorAll('.btn-edit-user').forEach(function(b) {
                     b.addEventListener('click', function() { openEditUser(b.dataset.id, b.dataset.username); });
                 });
+                tbody.querySelectorAll('.btn-perms-user').forEach(function(b) {
+                    b.addEventListener('click', function() {
+                        var perms = [];
+                        try { perms = JSON.parse(b.dataset.permissions || '[]'); } catch (e) {}
+                        openPermissionsModal(b.dataset.id, b.dataset.username, perms);
+                    });
+                });
                 tbody.querySelectorAll('.btn-del-user').forEach(function(b) {
                     b.addEventListener('click', function() { deleteUser(b.dataset.id, b.dataset.username); });
+                });
+            });
+        }
+
+        function loadSessions() {
+            api('/admin/sessions').then(function(x) {
+                if (!x.ok) { toast(x.json && x.json.error ? x.json.error : 'שגיאה בטעינה', true); return; }
+                var list = Array.isArray(x.json) ? x.json : [];
+                var tbody = document.getElementById('sessionsBody');
+                var empty = document.getElementById('sessionsEmpty');
+                var wrap = document.getElementById('sessionsTableWrap');
+                tbody.innerHTML = '';
+                if (!list.length) {
+                    empty.style.display = 'block';
+                    wrap.style.display = 'none';
+                    return;
+                }
+                empty.style.display = 'none';
+                wrap.style.display = 'block';
+                function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+                list.forEach(function(s) {
+                    var loginAt = s.login_at ? new Date(s.login_at).toLocaleString('he-IL') : '—';
+                    var lastAt = s.last_seen_at ? new Date(s.last_seen_at).toLocaleString('he-IL') : '—';
+                    var tr = document.createElement('tr');
+                    tr.innerHTML = '<td>' + esc(s.username) + '</td><td>' + loginAt + '</td><td>' + lastAt + '</td>';
+                    tbody.appendChild(tr);
                 });
             });
         }
@@ -216,10 +293,20 @@
                 if (!productions.length) { empty.style.display = 'block'; document.getElementById('productionsTableWrap').style.display = 'none'; return; }
                 empty.style.display = 'none';
                 document.getElementById('productionsTableWrap').style.display = 'block';
+                function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
                 productions.forEach(function(p) {
                     var tr = document.createElement('tr');
                     var ts = p.timestamp ? new Date(p.timestamp).toLocaleString('he-IL') : '—';
-                    tr.innerHTML = '<td>' + (p.username || '—') + '</td><td>' + ts + '</td><td>' + (p.family_name || 'כללי') + '</td><td>' + (p.file_count || 0) + '</td>';
+                    var names = p.file_names || [];
+                    var namesHtml = '';
+                    if (names.length) {
+                        namesHtml = '<div class="file-names-wrap">';
+                        names.forEach(function(n) { namesHtml += '<div class="file-name-item"><i class="fas fa-file-alt"></i> ' + esc(n) + '</div>'; });
+                        namesHtml += '</div>';
+                    } else {
+                        namesHtml = '<span style="color:#94a3b8;">—</span>';
+                    }
+                    tr.innerHTML = '<td>' + esc(p.username) + '</td><td>' + ts + '</td><td>' + esc(p.family_name || 'כללי') + '</td><td>' + (p.file_count || 0) + '</td><td>' + namesHtml + '</td>';
                     tbody.appendChild(tr);
                 });
             });
@@ -305,6 +392,54 @@
         document.getElementById('btnRefreshProd').addEventListener('click', function() { loadProductions(); });
         document.getElementById('prodFilterUser').addEventListener('change', function() { loadProductions(); });
         document.getElementById('prodLimit').addEventListener('change', function() { loadProductions(); });
+        document.getElementById('btnRefreshSessions').addEventListener('click', function() { loadSessions(); });
+
+        var permissionsList = [];
+        function openPermissionsModal(userId, username, currentPerms) {
+            document.getElementById('modalPermissionsUserId').value = userId;
+            document.getElementById('modalPermissionsTitle').textContent = 'הרשאות: ' + username;
+            var container = document.getElementById('modalPermissionsCheckboxes');
+            container.innerHTML = '';
+            if (!permissionsList.length) {
+                api('/admin/permissions-list').then(function(x) {
+                    if (x.ok && x.json && x.json.permissions) permissionsList = x.json.permissions;
+                    renderPermissionsCheckboxes(container, currentPerms);
+                });
+            } else {
+                renderPermissionsCheckboxes(container, currentPerms);
+            }
+            document.getElementById('modalPermissions').classList.add('active');
+        }
+        function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function renderPermissionsCheckboxes(container, currentPerms) {
+            container.innerHTML = '';
+            permissionsList.forEach(function(p) {
+                var div = document.createElement('div');
+                div.className = 'permission-item';
+                var checked = currentPerms.indexOf(p.id) >= 0;
+                div.innerHTML = '<input type="checkbox" id="perm-' + esc(p.id) + '" value="' + esc(p.id) + '" ' + (checked ? 'checked' : '') + '><label for="perm-' + esc(p.id) + '">' + esc(p.label || p.id) + '</label>';
+                container.appendChild(div);
+            });
+        }
+        document.getElementById('modalPermissionsCancel').addEventListener('click', function() {
+            document.getElementById('modalPermissions').classList.remove('active');
+        });
+        document.getElementById('modalPermissions').addEventListener('click', function(e) {
+            if (e.target === this) document.getElementById('modalPermissions').classList.remove('active');
+        });
+        document.getElementById('modalPermissionsSave').addEventListener('click', function() {
+            var userId = document.getElementById('modalPermissionsUserId').value;
+            var perms = [];
+            document.querySelectorAll('#modalPermissionsCheckboxes input:checked').forEach(function(cb) {
+                perms.push(cb.value);
+            });
+            api('/admin/users/' + userId, { method: 'PUT', body: JSON.stringify({ permissions: perms }) }).then(function(x) {
+                if (!x.ok) { toast(x.json && x.json.error ? x.json.error : 'שגיאה בשמירת הרשאות', true); return; }
+                toast('הרשאות נשמרו');
+                document.getElementById('modalPermissions').classList.remove('active');
+                loadUsers();
+            });
+        });
 
         loadUsers().then(function() {
             fillProdFilterUsers();
